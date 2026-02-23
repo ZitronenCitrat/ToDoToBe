@@ -1,14 +1,20 @@
 {
-  "name": "Meine PWA Projekt",
-  "short_name": "MeineApp",
-  "start_url": "index.html",
+  "name": "ToDoToBe",
+  "short_name": "ToDoToBe",
+  "description": "Dein persönlicher Planer für Aufgaben, Uni und Wunschliste",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f2f2f7",
-  "theme_color": "#007aff",
+  "background_color": "#050505",
+  "theme_color": "#050505",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "icon-192.png",
       "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
       "type": "image/png"
     }
   ]
