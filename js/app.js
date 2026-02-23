@@ -121,8 +121,8 @@ async function sha256(message) {
 }
 
 async function initAccessGate() {
-    // Already unlocked this browser session — skip gate
-    if (sessionStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') return;
+    // Already unlocked (persisted across sessions) — skip gate
+    if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') return;
 
     // Fetch the SHA-256 hash from Firestore config/appAccess (unauthenticated read)
     let storedHash = null;
@@ -136,7 +136,7 @@ async function initAccessGate() {
 
     // No password configured — skip gate silently
     if (!storedHash) {
-        sessionStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
+        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
         return;
     }
 
@@ -183,7 +183,7 @@ async function initAccessGate() {
         if (hash === storedHash) {
             localStorage.removeItem(ACCESS_FAILS_KEY);
             localStorage.removeItem(ACCESS_LOCKOUT_KEY);
-            sessionStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
+            localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
             if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
             gate.classList.add('hidden');
             authScreen.classList.remove('hidden');
@@ -525,8 +525,8 @@ let appInitialized = false;
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        // If the access gate hasn't been cleared this session, sign out immediately
-        if (sessionStorage.getItem(ACCESS_UNLOCKED_KEY) !== 'true') {
+        // If the access gate has never been passed, sign out immediately
+        if (localStorage.getItem(ACCESS_UNLOCKED_KEY) !== 'true') {
             await signOutUser(auth);
             return;
         }
@@ -558,8 +558,8 @@ onAuthStateChanged(auth, async (user) => {
         unsubscribeData();
 
         appShell.classList.add('hidden');
-        // Only show auth screen if the access gate has been passed this session
-        if (sessionStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') {
+        // Only show auth screen if the access gate has been passed before
+        if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') {
             authScreen.classList.remove('hidden');
         }
     }
