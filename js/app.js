@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, getRedirectResult } from 'https://www.gstatic.com/firebasejs/11.3.0/firebase-auth.js';
 import {
     initializeFirestore,
     persistentLocalCache,
@@ -567,3 +567,13 @@ onAuthStateChanged(auth, async (user) => {
 
 // Start access gate check on load
 initAccessGate();
+
+// Process pending redirect result from signInWithRedirect (mobile PWA).
+// Without this call, Firebase never completes the redirect sign-in flow and
+// onAuthStateChanged never fires with the user after the Google redirect.
+getRedirectResult(auth).catch((err) => {
+    // Ignore "no redirect" — only log real errors
+    if (err?.code && err.code !== 'auth/null-user') {
+        console.error('Auth redirect error:', err);
+    }
+});

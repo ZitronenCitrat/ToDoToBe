@@ -1,6 +1,7 @@
 import {
     GoogleAuthProvider,
     signInWithPopup,
+    signInWithRedirect,
     signOut,
     setPersistence,
     browserLocalPersistence
@@ -10,10 +11,12 @@ const provider = new GoogleAuthProvider();
 
 export async function signInWithGoogle(auth) {
     await setPersistence(auth, browserLocalPersistence);
-    // signInWithRedirect breaks iOS PWA: after Google redirect the app reloads
-    // in a new Safari tab, losing the PWA sessionStorage context and Firebase
-    // redirect state. signInWithPopup opens a popup window instead, which keeps
-    // the PWA session alive and delivers the result back directly.
+    // iOS Safari in PWA standalone mode blocks popups — use redirect instead.
+    // getRedirectResult() in app.js processes the result when the app reloads.
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+        return signInWithRedirect(auth, provider);
+    }
     return signInWithPopup(auth, provider);
 }
 
