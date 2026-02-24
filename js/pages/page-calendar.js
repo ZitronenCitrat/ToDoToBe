@@ -3,13 +3,14 @@ import { onRouteChange, navigate } from '../router.js';
 import { createTodoElement } from '../todo-item.js';
 import {
     getWeekdayShort, formatMonthYear, getDaysInMonth,
-    getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml
+    getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
+    getActiveSemester, isTodayLectureDay, toInputDate
 } from '../utils.js';
 
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
 let selectedDate = startOfDay(new Date());
-let calFilter = 'all'; // 'all' | 'todos' | 'uni'
+let calFilter = 'all'; // 'all' | 'todos' | 'uni' | 'wishes'
 let initialized = false;
 
 export function initPageCalendar() {
@@ -22,6 +23,9 @@ export function initPageCalendar() {
         <div class="page-header">
             <h1 class="page-header-title">Kalender</h1>
             <div class="page-header-actions">
+                <button class="icon-btn" id="cal-add-event-btn" title="Termin hinzufügen">
+                    <span class="material-symbols-outlined">event</span>
+                </button>
                 <button class="icon-btn" id="cal-today-btn" title="Heute">
                     <span class="material-symbols-outlined">today</span>
                 </button>
@@ -42,10 +46,11 @@ export function initPageCalendar() {
                 <div class="grid grid-cols-7 gap-1" id="cal-grid"></div>
             </div>
             <div class="mb-3">
-                <div class="flex gap-2 mb-3" id="cal-filter-tabs">
+                <div class="flex gap-2 mb-3" id="cal-filter-tabs" style="flex-wrap:wrap">
                     <button class="tab-btn active" data-filter="all">Alles</button>
                     <button class="tab-btn" data-filter="todos">Todos</button>
                     <button class="tab-btn" data-filter="uni">Uni</button>
+                    <button class="tab-btn" data-filter="wishes">Wünsche</button>
                 </div>
                 <h2 id="cal-day-label" style="font-size:16px;font-weight:600;margin-bottom:12px"></h2>
                 <div id="cal-day-items"></div>
@@ -79,6 +84,9 @@ export function initPageCalendar() {
         selectedDate = startOfDay(new Date());
         renderCalendar();
     });
+    container.querySelector('#cal-add-event-btn').addEventListener('click', () => {
+        openAddEventModal(selectedDate);
+    });
 
     // Filter tabs
     container.querySelector('#cal-filter-tabs').addEventListener('click', (e) => {
@@ -111,18 +119,50 @@ export function initPageCalendar() {
     renderCalendar();
 }
 
+// ----- helpers -----
+
+function getCourseSlotsForDate(date) {
+    const semester = getActiveSemester(appState.allSemesters);
+    if (!isTodayLectureDay(semester, date)) return [];
+
+    // Convert JS weekday (0=Sun) to Mon-based index (Mon=0 ... Sun=6)
+    const jsDay = date.getDay();
+    const weekdayIdx = jsDay === 0 ? 6 : jsDay - 1;
+
+    const slots = [];
+    appState.allCourses.forEach(course => {
+        (course.timeSlots || []).forEach(slot => {
+            if (slot.weekday === weekdayIdx) {
+                slots.push({ course, slot, type: 'course' });
+            }
+        });
+        (course.additionalEvents || []).forEach(extra => {
+            (extra.timeSlots || []).forEach(slot => {
+                if (slot.weekday === weekdayIdx) {
+                    slots.push({ course, slot, extra, type: 'extra' });
+                }
+            });
+        });
+    });
+
+    // Sort by start time
+    slots.sort((a, b) => (a.slot.startTime || '').localeCompare(b.slot.startTime || ''));
+    return slots;
+}
+
 function buildItemsByDay() {
     const todosByDay = {};
     const examsByDay = {};
     const assignmentsByDay = {};
+    const wishesByDay = {};
+    const eventsByDay = {};
 
     appState.allTodos.forEach(t => {
         if (!t.dueDate) return;
         const d = toDate(t.dueDate);
         if (!d) return;
         const key = startOfDay(d).toISOString();
-        if (!todosByDay[key]) todosByDay[key] = [];
-        todosByDay[key].push(t);
+        (todosByDay[key] = todosByDay[key] || []).push(t);
     });
 
     appState.allExams.forEach(e => {
@@ -130,8 +170,7 @@ function buildItemsByDay() {
         const d = toDate(e.date);
         if (!d) return;
         const key = startOfDay(d).toISOString();
-        if (!examsByDay[key]) examsByDay[key] = [];
-        examsByDay[key].push(e);
+        (examsByDay[key] = examsByDay[key] || []).push(e);
     });
 
     appState.allAssignments.forEach(a => {
@@ -139,11 +178,36 @@ function buildItemsByDay() {
         const d = toDate(a.dueDate);
         if (!d) return;
         const key = startOfDay(d).toISOString();
-        if (!assignmentsByDay[key]) assignmentsByDay[key] = [];
-        assignmentsByDay[key].push(a);
+        (assignmentsByDay[key] = assignmentsByDay[key] || []).push(a);
     });
 
-    return { todosByDay, examsByDay, assignmentsByDay };
+    appState.allWishlistItems.forEach(w => {
+        if (!w.date) return;
+        let d;
+        if (typeof w.date === 'string') {
+            d = new Date(w.date + 'T00:00:00');
+        } else {
+            d = toDate(w.date);
+        }
+        if (!d || isNaN(d)) return;
+        const key = startOfDay(d).toISOString();
+        (wishesByDay[key] = wishesByDay[key] || []).push(w);
+    });
+
+    appState.allEvents.forEach(ev => {
+        if (!ev.date) return;
+        let d;
+        if (typeof ev.date === 'string') {
+            d = new Date(ev.date + 'T00:00:00');
+        } else {
+            d = toDate(ev.date);
+        }
+        if (!d || isNaN(d)) return;
+        const key = startOfDay(d).toISOString();
+        (eventsByDay[key] = eventsByDay[key] || []).push(ev);
+    });
+
+    return { todosByDay, examsByDay, assignmentsByDay, wishesByDay, eventsByDay };
 }
 
 function renderCalendar() {
@@ -158,7 +222,7 @@ function renderCalendar() {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const firstDay = getFirstDayOfWeek(currentYear, currentMonth);
     const today = startOfDay(new Date());
-    const { todosByDay, examsByDay, assignmentsByDay } = buildItemsByDay();
+    const { todosByDay, examsByDay, assignmentsByDay, wishesByDay, eventsByDay } = buildItemsByDay();
 
     // Empty cells before first day
     for (let i = 0; i < firstDay; i++) {
@@ -176,12 +240,18 @@ function renderCalendar() {
         const todos = todosByDay[key] || [];
         const exams = examsByDay[key] || [];
         const assignments = assignmentsByDay[key] || [];
+        const wishes = wishesByDay[key] || [];
+        const events = eventsByDay[key] || [];
+        const courseSlots = getCourseSlotsForDate(cellDate);
 
         const isSelected = isSameDay(cellStart, selectedDate);
         const isCurrentDay = isSameDay(cellStart, today);
         const hasActiveTodos = todos.some(t => !t.completed);
         const hasExams = exams.length > 0;
         const hasAssignments = assignments.some(a => !a.completed);
+        const hasLecture = courseSlots.length > 0;
+        const hasWishes = wishes.length > 0;
+        const hasEvents = events.length > 0;
 
         const cell = document.createElement('button');
         cell.style.cssText = `
@@ -196,25 +266,26 @@ function renderCalendar() {
         cell.textContent = day;
 
         // Color dots for categories
-        if (!isSelected && (hasActiveTodos || hasExams || hasAssignments)) {
-            const dots = document.createElement('div');
-            dots.style.cssText = 'display:flex;gap:2px;position:absolute;bottom:3px';
-            if (hasActiveTodos) {
-                const d = document.createElement('div');
-                d.style.cssText = 'width:4px;height:4px;border-radius:50%;background:var(--accent)';
-                dots.appendChild(d);
+        if (!isSelected) {
+            const dotConfigs = [
+                { show: hasActiveTodos, color: 'var(--accent)' },
+                { show: hasExams, color: '#ef4444' },
+                { show: hasAssignments, color: '#f97316' },
+                { show: hasLecture, color: '#3b82f6' },
+                { show: hasWishes, color: '#a855f7' },
+                { show: hasEvents, color: '#22c55e' },
+            ].filter(c => c.show);
+
+            if (dotConfigs.length > 0) {
+                const dots = document.createElement('div');
+                dots.style.cssText = 'display:flex;gap:2px;position:absolute;bottom:3px';
+                dotConfigs.forEach(({ color }) => {
+                    const d = document.createElement('div');
+                    d.style.cssText = `width:4px;height:4px;border-radius:50%;background:${color}`;
+                    dots.appendChild(d);
+                });
+                cell.appendChild(dots);
             }
-            if (hasExams) {
-                const d = document.createElement('div');
-                d.style.cssText = 'width:4px;height:4px;border-radius:50%;background:#ef4444';
-                dots.appendChild(d);
-            }
-            if (hasAssignments) {
-                const d = document.createElement('div');
-                d.style.cssText = 'width:4px;height:4px;border-radius:50%;background:#f97316';
-                dots.appendChild(d);
-            }
-            cell.appendChild(dots);
         }
 
         cell.addEventListener('click', () => {
@@ -238,26 +309,30 @@ function renderDayItems() {
     const dayItems = container.querySelector('#cal-day-items');
     if (!dayItems) return;
 
-    const { todosByDay, examsByDay, assignmentsByDay } = buildItemsByDay();
+    const { todosByDay, examsByDay, assignmentsByDay, wishesByDay, eventsByDay } = buildItemsByDay();
     const key = startOfDay(selectedDate).toISOString();
 
     const todos = todosByDay[key] || [];
     const exams = examsByDay[key] || [];
     const assignments = assignmentsByDay[key] || [];
+    const wishes = wishesByDay[key] || [];
+    const events = eventsByDay[key] || [];
+    const courseSlots = (['all', 'uni'].includes(calFilter)) ? getCourseSlotsForDate(selectedDate) : [];
 
     dayItems.innerHTML = '';
-
     let hasContent = false;
 
-    // Todos section
-    if (calFilter !== 'uni' && todos.length > 0) {
+    function sectionLabel(text, color) {
+        const label = document.createElement('div');
+        label.style.cssText = `font-size:11px;font-weight:600;color:${color};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;margin-top:8px`;
+        label.textContent = text;
+        dayItems.appendChild(label);
+    }
+
+    // --- Todos ---
+    if (calFilter !== 'uni' && calFilter !== 'wishes' && todos.length > 0) {
         hasContent = true;
-        if (calFilter === 'all') {
-            const label = document.createElement('div');
-            label.style.cssText = 'font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px';
-            label.textContent = 'Todos';
-            dayItems.appendChild(label);
-        }
+        if (calFilter === 'all') sectionLabel('Todos', 'var(--accent)');
         todos.forEach(todo => {
             const listInfo = appState.allLists.find(l => l.id === todo.listId);
             const el = createTodoElement(todo, {
@@ -270,18 +345,40 @@ function renderDayItems() {
         });
     }
 
-    // Uni section: exams + assignments
-    if (calFilter !== 'todos' && (exams.length > 0 || assignments.filter(a => !a.completed).length > 0)) {
+    // --- Uni: timetable slots + exams + assignments ---
+    const showUni = calFilter === 'all' || calFilter === 'uni';
+    const openAssignments = assignments.filter(a => !a.completed);
+
+    if (showUni && (courseSlots.length > 0 || exams.length > 0 || openAssignments.length > 0)) {
         hasContent = true;
-        const openAssignments = assignments.filter(a => !a.completed);
+        if (calFilter === 'all') sectionLabel('Uni', '#3b82f6');
 
-        if (calFilter === 'all') {
-            const label = document.createElement('div');
-            label.style.cssText = 'font-size:11px;font-weight:600;color:#ef4444;text-transform:uppercase;letter-spacing:0.5px;margin:12px 0 6px';
-            label.textContent = 'Uni';
-            dayItems.appendChild(label);
-        }
+        // Timetable blocks (course slots for this day)
+        courseSlots.forEach(({ course, slot, extra, type }) => {
+            const dateStr = toInputDate(selectedDate);
+            const isSkipped = (course.skippedDates || []).includes(dateStr);
+            const color = course.color || '#3742fa';
+            const timeStr = (slot.startTime && slot.endTime) ? `${slot.startTime}–${slot.endTime}` : '';
+            const name = type === 'extra'
+                ? `${escapeHtml(extra.name || 'Übung')} (${escapeHtml(course.name)})`
+                : escapeHtml(course.name);
+            const typeLabel = type === 'extra' ? escapeHtml(extra.type || 'Übung') : 'Vorlesung';
+            const icon = type === 'extra' ? 'group_work' : 'school';
 
+            const card = document.createElement('div');
+            card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
+            card.style.cssText = `border-left:3px solid ${color};${isSkipped ? 'opacity:0.3;' : ''}`;
+            card.innerHTML = `
+                <span class="material-symbols-outlined" style="font-size:20px;color:${color};flex-shrink:0">${icon}</span>
+                <div class="flex-1 min-w-0">
+                    <div style="font-size:14px;font-weight:500">${name}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary)">${typeLabel}${timeStr ? ' · ' + timeStr : ''}${course.room ? ' · ' + escapeHtml(course.room) : ''}${isSkipped ? ' · <span style="color:#ef4444">ausgefallen</span>' : ''}</div>
+                </div>
+            `;
+            dayItems.appendChild(card);
+        });
+
+        // Exams
         exams.forEach(exam => {
             const course = appState.allCourses.find(c => c.id === exam.courseId);
             const card = document.createElement('div');
@@ -291,13 +388,14 @@ function renderDayItems() {
                 <span class="material-symbols-outlined" style="font-size:20px;color:#ef4444;flex-shrink:0">quiz</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(exam.title)}</div>
-                    <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(course?.name || '')} · Klausur${exam.room ? ' · ' + escapeHtml(exam.room) : ''}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(course?.name || '')} · Klausur${exam.room ? ' · ' + escapeHtml(exam.room) : ''}${exam.time ? ' · ' + exam.time : ''}</div>
                 </div>
                 ${exam.grade != null ? `<span style="font-size:13px;font-weight:600;color:${exam.grade <= 4 ? 'var(--accent)' : '#ef4444'}">${exam.grade.toFixed(1)}</span>` : ''}
             `;
             dayItems.appendChild(card);
         });
 
+        // Open assignments
         openAssignments.forEach(a => {
             const course = appState.allCourses.find(c => c.id === a.courseId);
             const card = document.createElement('div');
@@ -314,10 +412,148 @@ function renderDayItems() {
         });
     }
 
+    // --- Termine / Events ---
+    if ((calFilter === 'all') && events.length > 0) {
+        hasContent = true;
+        sectionLabel('Termine', '#22c55e');
+        events.forEach(ev => {
+            const card = document.createElement('div');
+            card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
+            card.style.cssText = 'border-left:3px solid #22c55e';
+            card.innerHTML = `
+                <span class="material-symbols-outlined" style="font-size:20px;color:#22c55e;flex-shrink:0">event</span>
+                <div class="flex-1 min-w-0">
+                    <div style="font-size:14px;font-weight:500">${escapeHtml(ev.title)}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary)">${ev.time ? ev.time : ''}${ev.time && ev.category ? ' · ' : ''}${ev.category ? escapeHtml(ev.category) : ''}</div>
+                </div>
+                <button class="icon-btn event-edit-btn" data-id="${escapeAttr(ev.id)}" style="width:28px;height:28px;flex-shrink:0">
+                    <span class="material-symbols-outlined" style="font-size:15px">edit</span>
+                </button>
+            `;
+            dayItems.appendChild(card);
+        });
+    }
+
+    // --- Wünsche ---
+    if ((calFilter === 'all' || calFilter === 'wishes') && wishes.length > 0) {
+        hasContent = true;
+        if (calFilter === 'all') sectionLabel('Wünsche', '#a855f7');
+        wishes.forEach(w => {
+            const nutzen = w.nutzen || 0;
+            const stars = '★'.repeat(nutzen) + '☆'.repeat(Math.max(0, 5 - nutzen));
+            const card = document.createElement('div');
+            card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
+            card.style.cssText = 'border-left:3px solid #a855f7';
+            card.innerHTML = `
+                <span class="material-symbols-outlined" style="font-size:20px;color:#a855f7;flex-shrink:0">star</span>
+                <div class="flex-1 min-w-0">
+                    <div style="font-size:14px;font-weight:500">${escapeHtml(w.name || w.title || '')}</div>
+                    <div style="font-size:11px;color:#a855f7;letter-spacing:2px">${stars}</div>
+                </div>
+                ${w.price != null ? `<span style="font-size:12px;color:var(--text-tertiary);flex-shrink:0">${w.price.toFixed(2)} €</span>` : ''}
+            `;
+            dayItems.appendChild(card);
+        });
+    }
+
+    // Wire event edit buttons
+    dayItems.querySelectorAll('.event-edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const ev = appState.allEvents.find(ev => ev.id === btn.dataset.id);
+            if (ev) openAddEventModal(selectedDate, ev);
+        });
+    });
+
     if (!hasContent) {
         dayItems.innerHTML = `
             <div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:14px">
                 Nichts an diesem Tag
             </div>`;
     }
+}
+
+// ----- Add / Edit Event Modal -----
+
+const EVENT_CATEGORIES = ['Uni', 'Wünsche', 'Todos', 'Persönlich', 'Arbeit', 'Sonstiges'];
+
+function openAddEventModal(defaultDate, existing = null) {
+    const old = document.getElementById('event-modal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'event-modal';
+    modal.className = 'modal-overlay';
+
+    const dateStr = existing
+        ? (typeof existing.date === 'string' ? existing.date : toInputDate(toDate(existing.date)) || '')
+        : toInputDate(defaultDate);
+
+    modal.innerHTML = `
+        <div class="modal-backdrop"></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <h2 class="text-lg font-semibold mb-4">${existing ? 'Termin bearbeiten' : 'Neuer Termin'}</h2>
+            <input type="text" id="event-title" class="glass-input w-full mb-3"
+                placeholder="Titel" value="${existing ? escapeAttr(existing.title || '') : ''}">
+            <div class="flex gap-2 mb-3">
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
+                    <input type="date" id="event-date" class="glass-input w-full" value="${dateStr || ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Uhrzeit</div>
+                    <input type="time" id="event-time" class="glass-input w-full" value="${existing?.time || ''}">
+                </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Kategorie</div>
+            <select id="event-category" class="glass-select w-full mb-3">
+                <option value="">Keine Kategorie</option>
+                ${EVENT_CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${existing?.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+            </select>
+            <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Wiederholung</div>
+            <select id="event-recurrence" class="glass-select w-full mb-4">
+                <option value="">Einmalig</option>
+                <option value="weekly" ${existing?.recurrence === 'weekly' ? 'selected' : ''}>Wöchentlich</option>
+                <option value="monthly" ${existing?.recurrence === 'monthly' ? 'selected' : ''}>Monatlich</option>
+            </select>
+            <div class="flex gap-2">
+                <button id="event-save" class="btn-accent flex-1">${existing ? 'Speichern' : 'Hinzufügen'}</button>
+                ${existing ? '<button id="event-delete" class="btn-ghost flex-1" style="color:#ef4444">Löschen</button>' : ''}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#event-save').addEventListener('click', async () => {
+        const title = modal.querySelector('#event-title').value.trim();
+        if (!title) return;
+        const data = {
+            title,
+            date: modal.querySelector('#event-date').value || null,
+            time: modal.querySelector('#event-time').value || null,
+            category: modal.querySelector('#event-category').value || null,
+            recurrence: modal.querySelector('#event-recurrence').value || null,
+        };
+        const { addEvent, updateEvent } = await import('../db.js');
+        if (existing) {
+            await updateEvent(existing.id, data);
+        } else {
+            await addEvent(data);
+        }
+        modal.remove();
+    });
+
+    if (existing) {
+        modal.querySelector('#event-delete')?.addEventListener('click', async () => {
+            if (!confirm('Termin löschen?')) return;
+            const { deleteEvent } = await import('../db.js');
+            await deleteEvent(existing.id);
+            modal.remove();
+        });
+    }
+
+    setTimeout(() => modal.querySelector('#event-title').focus(), 100);
 }

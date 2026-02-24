@@ -34,6 +34,9 @@
     <!-- Custom Styles -->
     <link rel="stylesheet" href="style.css">
 
+    <!-- Google Identity Services (for Google Calendar OAuth) -->
+    <script src="https://accounts.google.com/gsi/client" async></script>
+
     <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -114,7 +117,15 @@
 
         <!-- Mode Tabs (Top Bar) -->
         <div id="mode-tabs" class="mode-tabs-bar">
-            <button class="mode-tab active" data-mode="todo">
+            <button class="mode-tab active" data-mode="home">
+                <span class="material-symbols-outlined">home</span>
+                <span>Home</span>
+            </button>
+            <button class="mode-tab" data-mode="calendar">
+                <span class="material-symbols-outlined">calendar_month</span>
+                <span>Kalender</span>
+            </button>
+            <button class="mode-tab" data-mode="todo">
                 <span class="material-symbols-outlined">checklist</span>
                 <span>To-Do</span>
             </button>
@@ -127,6 +138,9 @@
                 <span>Wünsche</span>
             </button>
         </div>
+
+        <!-- Page Container — Home -->
+        <div id="page-home" class="page"></div>
 
         <!-- Page Containers — To-Do -->
         <div id="page-today" class="page"></div>
@@ -154,6 +168,9 @@
         <div id="page-weekly-review" class="page"></div>
         <div id="page-flashcard-decks" class="page"></div>
         <div id="page-flashcard-study" class="page"></div>
+
+        <!-- Page Containers — Termine (Calendar Events) -->
+        <div id="page-events" class="page"></div>
 
         <!-- FAB (Floating Action Button) -->
         <button id="fab" class="fab">
