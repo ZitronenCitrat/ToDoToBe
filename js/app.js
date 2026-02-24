@@ -223,6 +223,11 @@ googleSignInBtn.addEventListener('click', async () => {
     googleSignInBtn.disabled = true;
     googleSignInBtn.textContent = 'Anmeldung\u2026';
     try {
+        // Unlock-Key jetzt setzen: Der User hat die Access Gate bereits passiert
+        // und klickt bewusst auf "Mit Google anmelden". Nach dem Redirect muss
+        // onAuthStateChanged den User durchlassen, auch wenn getRedirectResult
+        // aus irgendeinem Grund null zurückgibt.
+        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
         await signInWithGoogle(auth);
     } catch (err) {
         console.error('Sign-in error:', err);
@@ -523,57 +528,71 @@ async function initPages() {
 
 let appInitialized = false;
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        // If the access gate has never been passed, sign out immediately
-        if (localStorage.getItem(ACCESS_UNLOCKED_KEY) !== 'true') {
-            await signOutUser(auth);
-            return;
+async function boot() {
+    console.log("BOOT: start");
+
+    // getRedirectResult MUSS als allererstes aufgerufen werden, bevor andere
+    // async-Operationen (z.B. Firestore-Fetches) die interne Firebase-Verarbeitung
+    // stören können.
+    try {
+        const result = await getRedirectResult(auth);
+        console.log("BOOT: redirectResult =", result);
+        if (result) {
+            localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
         }
-
-        appState.user = user;
-
-        // Hide auth, show app
-        authScreen.classList.add('hidden');
-        appShell.classList.remove('hidden');
-
-        // Init user data in Firestore
-        const { initUser } = await import('./db.js');
-        await initUser(user);
-
-        // Subscribe to real-time data
-        await subscribeToData();
-
-        // Init navigation, router, and pages (only once)
-        if (!appInitialized) {
-            initModeTabs();
-            initNav();
-            initRouter();
-            setupQuickAddModal();
-            await initPages();
-            appInitialized = true;
-        }
-    } else {
-        appState.user = null;
-        unsubscribeData();
-
-        appShell.classList.add('hidden');
-        // Only show auth screen if the access gate has been passed before
-        if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') {
-            authScreen.classList.remove('hidden');
-        }
+    } catch (err) {
+        console.error("Auth redirect error:", err);
     }
-});
 
-// Start access gate check on load
-initAccessGate();
+    await initAccessGate();
+    console.log("BOOT: gate done, unlocked =", localStorage.getItem(ACCESS_UNLOCKED_KEY));
 
-// Process pending redirect result from signInWithRedirect (mobile PWA).
-// Without this call, Firebase never completes the redirect sign-in flow and
-// onAuthStateChanged never fires with the user after the Google redirect.
-getRedirectResult(auth).catch((err) => {
-    // Ignore "no redirect" — only log real errors
-    if (err?.code && err.code !== 'auth/null-user') {
-        console.error('Auth redirect error:', err);
-    }
-});
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const isUnlocked = localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true';
+            
+            if (!isUnlocked) {
+                console.warn("Zugang nicht entsperrt – Abmeldung.");
+                await signOutUser(auth);
+                return;
+            }
+
+            appState.user = user;
+            authScreen.classList.add('hidden');
+            appShell.classList.remove('hidden');
+
+            try {
+                const { initUser } = await import('./db.js');
+                await initUser(user);
+                await subscribeToData();
+
+                if (!appInitialized) {
+                    initModeTabs();
+                    initNav();
+                    await initPages(); 
+                    initRouter(); 
+                    setupQuickAddModal();
+                    appInitialized = true;
+
+                    if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
+                        const savedMode = localStorage.getItem('todotobe-mode') || 'todo';
+                        const { navigate } = await import('./router.js');
+                        navigate(MODE_DEFAULTS[savedMode]);
+                    }
+                }
+            } catch (err) {
+                console.error('Fehler beim App-Start:', err);
+            }
+        } else {
+            appState.user = null;
+            unsubscribeData();
+            appShell.classList.add('hidden');
+
+            if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') {
+                authScreen.classList.remove('hidden');
+            }
+        }
+    });
+}
+
+boot();

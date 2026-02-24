@@ -1,4 +1,4 @@
-const CACHE_NAME = 'todotobe-v10';
+const CACHE_NAME = 'todotobe-v11';
 
 const APP_SHELL = [
     './',
@@ -65,7 +65,9 @@ self.addEventListener('fetch', (event) => {
     if (url.hostname.includes('firestore.googleapis.com') ||
         url.hostname.includes('identitytoolkit.googleapis.com') ||
         url.hostname.includes('securetoken.googleapis.com') ||
-        url.hostname.includes('accounts.google.com')) {
+        url.hostname.includes('accounts.google.com') ||
+        url.hostname.includes('firebaseapp.com') ||
+        url.pathname.includes('/__/auth/')) {
         return;
     }
 

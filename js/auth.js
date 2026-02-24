@@ -11,13 +11,12 @@ const provider = new GoogleAuthProvider();
 
 export async function signInWithGoogle(auth) {
     await setPersistence(auth, browserLocalPersistence);
-    // iOS Safari in PWA standalone mode blocks popups — use redirect instead.
-    // getRedirectResult() in app.js processes the result when the app reloads.
+    
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
         return signInWithRedirect(auth, provider);
     }
-    return signInWithPopup(auth, provider);
+    return signInWithRedirect(auth, provider);
 }
 
 export async function signOutUser(auth) {
