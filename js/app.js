@@ -5,7 +5,7 @@ import {
     persistentLocalCache,
     persistentMultipleTabManager
 } from 'https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js';
-import { signInWithGoogle, signOutUser } from './auth.js';
+import { signInWithGoogle, signInWithEmail, isPasswordLinked, getAuthErrorMessage, signOutUser } from './auth.js';
 import { initRouter } from './router.js';
 import { initNav, updateBadges } from './nav.js';
 
@@ -218,6 +218,10 @@ async function initAccessGate() {
 const authScreen = document.getElementById('auth-screen');
 const appShell = document.getElementById('app-shell');
 const googleSignInBtn = document.getElementById('google-sign-in');
+const emailSignInBtn = document.getElementById('email-sign-in-btn');
+const authEmailInput = document.getElementById('auth-email');
+const authPasswordInput = document.getElementById('auth-password');
+const authEmailError = document.getElementById('auth-email-error');
 
 googleSignInBtn.addEventListener('click', async () => {
     googleSignInBtn.disabled = true;
@@ -241,6 +245,37 @@ googleSignInBtn.addEventListener('click', async () => {
             </svg>
             Mit Google anmelden`;
     }
+});
+
+emailSignInBtn.addEventListener('click', async () => {
+    const email = authEmailInput.value.trim();
+    const password = authPasswordInput.value;
+    authEmailError.classList.add('hidden');
+
+    if (!email || !password) {
+        authEmailError.textContent = 'Bitte E-Mail und Passwort eingeben.';
+        authEmailError.classList.remove('hidden');
+        return;
+    }
+
+    emailSignInBtn.disabled = true;
+    emailSignInBtn.textContent = 'Anmeldung\u2026';
+
+    try {
+        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
+        await signInWithEmail(auth, email, password);
+    } catch (err) {
+        console.error('Email sign-in error:', err);
+        localStorage.removeItem(ACCESS_UNLOCKED_KEY);
+        authEmailError.textContent = getAuthErrorMessage(err.code);
+        authEmailError.classList.remove('hidden');
+        emailSignInBtn.disabled = false;
+        emailSignInBtn.textContent = 'Mit E-Mail anmelden';
+    }
+});
+
+authPasswordInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') emailSignInBtn.click();
 });
 
 // ===== FAB =====
@@ -378,6 +413,83 @@ export function openQuickAdd(prefillDate = null) {
 
 export function closeQuickAdd() {
     document.getElementById('quick-add-modal').classList.add('hidden');
+}
+
+// ===== Set Password Prompt (shown after first Google sign-in) =====
+
+function openSetPasswordPrompt(user) {
+    const safeEmail = (user.email || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal-backdrop"></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <h2 class="text-lg font-semibold mb-1">Passwort setzen</h2>
+            <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px">
+                Setze ein Passwort, damit du dich alternativ auch ohne Google anmelden kannst.
+            </p>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+                E-Mail: <strong style="color:var(--text-primary)">${safeEmail}</strong>
+            </p>
+            <input type="password" id="set-pw-input" class="glass-input w-full"
+                placeholder="Neues Passwort (min. 8 Zeichen)" autocomplete="new-password" style="margin-bottom:10px">
+            <input type="password" id="set-pw-confirm" class="glass-input w-full"
+                placeholder="Passwort bestätigen" autocomplete="new-password" style="margin-bottom:8px">
+            <p id="set-pw-error" class="hidden" style="font-size:13px;color:#ef4444;margin-bottom:8px"></p>
+            <button id="set-pw-save" class="btn-accent w-full" style="margin-bottom:10px">Passwort setzen</button>
+            <button id="set-pw-skip" class="btn-ghost w-full">Jetzt überspringen</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const pwInput    = overlay.querySelector('#set-pw-input');
+    const confirmInput = overlay.querySelector('#set-pw-confirm');
+    const errorEl    = overlay.querySelector('#set-pw-error');
+    const saveBtn    = overlay.querySelector('#set-pw-save');
+    const skipBtn    = overlay.querySelector('#set-pw-skip');
+    const backdrop   = overlay.querySelector('.modal-backdrop');
+
+    function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+
+    backdrop.addEventListener('click', close);
+    skipBtn.addEventListener('click', close);
+
+    saveBtn.addEventListener('click', async () => {
+        const pw      = pwInput.value;
+        const confirm = confirmInput.value;
+        errorEl.classList.add('hidden');
+
+        if (pw.length < 8) {
+            errorEl.textContent = 'Passwort muss mindestens 8 Zeichen haben.';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+        if (pw !== confirm) {
+            errorEl.textContent = 'Passwörter stimmen nicht überein.';
+            errorEl.classList.remove('hidden');
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Wird gesetzt\u2026';
+
+        try {
+            const { linkEmailPassword } = await import('./auth.js');
+            await linkEmailPassword(user, pw);
+            close();
+        } catch (err) {
+            console.error('Link password error:', err);
+            errorEl.textContent = getAuthErrorMessage(err.code);
+            errorEl.classList.remove('hidden');
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Passwort setzen';
+        }
+    });
+
+    confirmInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveBtn.click(); });
+    setTimeout(() => pwInput.focus(), 150);
 }
 
 // ===== Data Subscriptions =====
@@ -563,14 +675,14 @@ async function boot() {
 
             try {
                 const { initUser } = await import('./db.js');
-                await initUser(user);
+                const { isNewUser } = await initUser(user);
                 await subscribeToData();
 
                 if (!appInitialized) {
                     initModeTabs();
                     initNav();
-                    await initPages(); 
-                    initRouter(); 
+                    await initPages();
+                    initRouter();
                     setupQuickAddModal();
                     appInitialized = true;
 
@@ -578,6 +690,11 @@ async function boot() {
                         const savedMode = localStorage.getItem('todotobe-mode') || 'todo';
                         const { navigate } = await import('./router.js');
                         navigate(MODE_DEFAULTS[savedMode]);
+                    }
+
+                    // First-ever sign-in via Google → offer to set a backup password
+                    if (isNewUser && !isPasswordLinked(user)) {
+                        setTimeout(() => openSetPasswordPrompt(user), 800);
                     }
                 }
             } catch (err) {

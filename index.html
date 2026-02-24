@@ -86,6 +86,23 @@
                 </svg>
                 Mit Google anmelden
             </button>
+
+            <!-- Divider -->
+            <div style="display:flex;align-items:center;gap:12px;margin:20px 0 16px;width:100%">
+                <div style="flex:1;height:1px;background:rgba(255,255,255,0.12)"></div>
+                <span style="font-size:12px;color:var(--text-secondary);letter-spacing:0.05em;white-space:nowrap">oder mit E-Mail</span>
+                <div style="flex:1;height:1px;background:rgba(255,255,255,0.12)"></div>
+            </div>
+
+            <!-- Email / Password Form -->
+            <input type="email" id="auth-email" class="glass-input w-full"
+                placeholder="E-Mail-Adresse" autocomplete="email" style="margin-bottom:10px">
+            <input type="password" id="auth-password" class="glass-input w-full"
+                placeholder="Passwort" autocomplete="current-password" style="margin-bottom:8px">
+            <p id="auth-email-error" class="hidden" style="font-size:13px;color:#ef4444;text-align:center;margin:0 0 8px"></p>
+            <button id="email-sign-in-btn" class="btn-accent w-full" style="margin-bottom:4px">
+                Mit E-Mail anmelden
+            </button>
         </div>
     </div>
 

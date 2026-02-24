@@ -31,7 +31,11 @@ export async function initUser(user) {
             isDefault: true,
             createdAt: Timestamp.now()
         });
+
+        return { isNewUser: true };
     }
+
+    return { isNewUser: false };
 }
 
 // ===== User Settings =====
