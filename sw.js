@@ -65,6 +65,10 @@ self.addEventListener('fetch', (event) => {
         return; // Direkt ans Netzwerk geben, SW hält sich raus
     }
 
+    if (url.search.length > 0) {
+        return; 
+    }
+
     // Never cache Firebase / Google Auth requests
     if (url.hostname.includes('firestore.googleapis.com') ||
         url.hostname.includes('identitytoolkit.googleapis.com') ||
