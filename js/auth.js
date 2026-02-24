@@ -30,14 +30,19 @@ function isIOSPWA() {
 }
 
 export async function signInWithGoogle(auth) {
-    await setPersistence(auth, browserLocalPersistence);
+    setPersistence(auth, browserLocalPersistence);
 
-    if (isIOSPWA()) {
-        return signInWithRedirect(auth, provider);
+    try {
+        const result = await signInWithPopup(auth, provider);
+        return result;
+    } catch (error) {
+        console.error("Popup Error:", error);
+        
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+            return signInWithRedirect(auth, provider);
+        }
+        throw error;
     }
-
-    // Alle anderen Plattformen: Popup (Desktop, Android PWA, iOS Safari Browser)
-    return signInWithPopup(auth, provider);
 }
 
 export async function signOutUser(auth) {
