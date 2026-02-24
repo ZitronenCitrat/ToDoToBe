@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
     if (url.search.includes('apiKey=') || url.search.includes('authType=')) {
-        return; // Direkt ans Netzwerk geben, SW hält sich raus
+        return;
     }
 
     // Never cache Firebase / Google Auth requests
