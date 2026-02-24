@@ -1,6 +1,8 @@
 const routes = {
+    'home':                 { page: 'home',                 showNav: true  },
     'today':                { page: 'today',                showNav: true  },
     'calendar':             { page: 'calendar',             showNav: true  },
+    'events':               { page: 'events',               showNav: false },
     'projects':             { page: 'projects',             showNav: true  },
     'project':              { page: 'project-detail',       showNav: false },
     'task':                 { page: 'task-detail',          showNav: false },
@@ -39,7 +41,7 @@ export function back() {
     if (window.history.length > 1) {
         window.history.back();
     } else {
-        navigate('today');
+        navigate('home');
     }
 }
 
@@ -66,7 +68,7 @@ function handleRoute() {
 
     const routeDef = routes[routeKey];
     if (!routeDef) {
-        navigate('today');
+        navigate('home');
         return;
     }
 

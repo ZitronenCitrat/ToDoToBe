@@ -5,6 +5,11 @@
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;    /* IE/Edge */
+}
+*::-webkit-scrollbar {
+    display: none;               /* Chrome/Safari/WebKit */
 }
 
 :root {
@@ -1257,6 +1262,96 @@ input, textarea, select {
 
 .timetable-block:hover {
     opacity: 0.8;
+}
+
+/* Skipped timetable block */
+.timetable-block.skipped {
+    opacity: 0.25;
+    filter: grayscale(1);
+    pointer-events: auto;
+}
+
+/* Day swipe navigation (mobile timetable) */
+.timetable-day-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 20px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.timetable-day-btn {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--surface-border);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+}
+
+.timetable-day-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Star rating (nutzen) for wishlist */
+.star-rating {
+    display: flex;
+    gap: 4px;
+}
+
+.star-rating .star {
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    transition: color 0.1s;
+    user-select: none;
+}
+
+.star-rating .star.filled {
+    color: var(--accent);
+}
+
+/* Course card (expandable) on uni overview */
+.course-expand-card {
+    transition: all 0.2s;
+}
+
+.course-expand-card .course-expand-body {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease-out;
+}
+
+.course-expand-card.open .course-expand-body {
+    max-height: 1000px;
+}
+
+/* Wish date dot in calendar */
+.dot-wish {
+    background: #a855f7;
+}
+
+/* Calendar event card — Termin */
+.event-card {
+    border-left: 3px solid var(--accent);
+}
+
+/* Long-press visual feedback */
+.long-press-active {
+    transform: scale(0.97);
+    opacity: 0.7;
+    transition: all 0.1s;
 }
 
 /* ===== Wishlist Card Priority Bars ===== */

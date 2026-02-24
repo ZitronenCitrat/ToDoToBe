@@ -35,7 +35,7 @@ export { app, auth, db };
 
 export const appState = {
     user: null,
-    activeMode: 'todo',        // 'todo' | 'uni' | 'wishlist'
+    activeMode: 'home',        // 'home' | 'todo' | 'uni' | 'wishlist' | 'calendar'
     allTodos: [],
     allLists: [],
     allCourses: [],
@@ -46,6 +46,7 @@ export const appState = {
     habitLogs: [],
     allFlashcards: [],
     allSemesters: [],
+    allEvents: [],             // calendar Termine
     settings: { theme: 'dark', notifications: false }
 };
 
@@ -63,22 +64,23 @@ function notifyStateChange() {
 // ===== Mode System =====
 
 const MODE_DEFAULTS = {
+    home: 'home',
+    calendar: 'calendar',
     todo: 'today',
     uni: 'uni',
     wishlist: 'wishlist'
 };
 
 export async function setMode(mode) {
-    if (!['todo', 'uni', 'wishlist'].includes(mode)) return;
+    if (!['home', 'calendar', 'todo', 'uni', 'wishlist'].includes(mode)) return;
     appState.activeMode = mode;
     localStorage.setItem('todotobe-mode', mode);
 
     // Persist to Firestore settings
     try {
         const { updateUserSettings } = await import('./db.js');
-        const newSettings = { ...appState.settings, activeMode: mode };
-        appState.settings = newSettings;
-        await updateUserSettings(newSettings);
+        Object.assign(appState.settings, { activeMode: mode });
+        await updateUserSettings(appState.settings);
     } catch (e) {
         console.error('Failed to persist mode:', e);
     }
@@ -504,13 +506,14 @@ let habitsUnsub = null;
 let habitLogsUnsub = null;
 let flashcardsUnsub = null;
 let semestersUnsub = null;
+let eventsUnsub = null;
 
 async function subscribeToData() {
     const {
         subscribeTodos, subscribeLists,
         subscribeCourses, subscribeExams, subscribeAssignments,
         subscribeWishlistItems, subscribeHabits, subscribeHabitLogs,
-        subscribeFlashcards, subscribeSemesters
+        subscribeFlashcards, subscribeSemesters, subscribeEvents
     } = await import('./db.js');
     const { isToday, isOverdue } = await import('./utils.js');
 
@@ -566,6 +569,11 @@ async function subscribeToData() {
         appState.allSemesters = semesters;
         notifyStateChange();
     });
+
+    eventsUnsub = subscribeEvents((events) => {
+        appState.allEvents = events;
+        notifyStateChange();
+    });
 }
 
 function unsubscribeData() {
@@ -577,6 +585,7 @@ function unsubscribeData() {
     if (wishlistUnsub) { wishlistUnsub(); wishlistUnsub = null; }
     if (habitsUnsub) { habitsUnsub(); habitsUnsub = null; }
     if (habitLogsUnsub) { habitLogsUnsub(); habitLogsUnsub = null; }
+    if (eventsUnsub) { eventsUnsub(); eventsUnsub = null; }
     if (flashcardsUnsub) { flashcardsUnsub(); flashcardsUnsub = null; }
     if (semestersUnsub) { semestersUnsub(); semestersUnsub = null; }
 }
@@ -584,6 +593,7 @@ function unsubscribeData() {
 // ===== Page Initialization =====
 
 async function initPages() {
+    const { initPageHome } = await import('./pages/page-home.js');
     const { initPageToday } = await import('./pages/page-today.js');
     const { initPageTaskDetail } = await import('./pages/page-task-detail.js');
     const { initPageProjects } = await import('./pages/page-projects.js');
@@ -603,7 +613,9 @@ async function initPages() {
     const { initPageWeeklyReview } = await import('./pages/page-weekly-review.js');
     const { initPageFlashcardDecks } = await import('./pages/page-flashcard-decks.js');
     const { initPageFlashcardStudy } = await import('./pages/page-flashcard-study.js');
+    const { initPageEvents } = await import('./pages/page-events.js');
 
+    initPageHome();
     initPageToday();
     initPageTaskDetail();
     initPageProjects();
@@ -623,6 +635,7 @@ async function initPages() {
     initPageWeeklyReview();
     initPageFlashcardDecks();
     initPageFlashcardStudy();
+    initPageEvents();
 
     // Load and apply saved theme + mode
     const { getUserSettings } = await import('./db.js');
@@ -631,7 +644,7 @@ async function initPages() {
     applyTheme(settings.theme);
 
     // Restore active mode from settings/localStorage
-    const savedMode = settings.activeMode || localStorage.getItem('todotobe-mode') || 'todo';
+    const savedMode = settings.activeMode || localStorage.getItem('todotobe-mode') || 'home';
     appState.activeMode = savedMode;
     updateModeTabs(savedMode);
 }
@@ -687,9 +700,9 @@ async function boot() {
                     appInitialized = true;
 
                     if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
-                        const savedMode = localStorage.getItem('todotobe-mode') || 'todo';
+                        const savedMode = localStorage.getItem('todotobe-mode') || 'home';
                         const { navigate } = await import('./router.js');
-                        navigate(MODE_DEFAULTS[savedMode]);
+                        navigate(MODE_DEFAULTS[savedMode] || 'home');
                     }
 
                     // First-ever sign-in via Google → offer to set a backup password

@@ -99,24 +99,64 @@ export function urgencyClass(timestamp) {
     return '';
 }
 
+/**
+ * Returns true if the given date is within the lecture period of a semester.
+ * Lecture period = lectureStart..lectureEnd, minus any holiday periods.
+ * The semester is "active" if today is between semesterStart and semesterEnd
+ * (or the manual isActive override is set).
+ */
 export function isTodayLectureDay(semester, date = new Date()) {
     if (!semester) return true;
     const d = startOfDay(date);
-    const start = toDate(semester.lectureStart);
-    const end = toDate(semester.lectureEnd);
-    if (!start || !end) return true;
-    if (d < startOfDay(start) || d > startOfDay(end)) return false;
-    // Check lecture-free period (vorlesungsfreie Zeit)
-    const freeStart = toDate(semester.lectureFreeStart);
-    const freeEnd = toDate(semester.lectureFreeEnd);
-    if (freeStart && freeEnd && d >= startOfDay(freeStart) && d <= startOfDay(freeEnd)) return false;
-    // Check individual holiday periods (Ferien)
+
+    const lectStart = toDate(semester.lectureStart);
+    const lectEnd = toDate(semester.lectureEnd);
+    if (!lectStart || !lectEnd) return true;
+
+    // Must be within lecture period
+    if (d < startOfDay(lectStart) || d > startOfDay(lectEnd)) return false;
+
+    // Check individual holiday periods (Ferien) — these override even within lecture period
     for (const h of (semester.holidays || [])) {
         const hs = toDate(h.start);
         const he = toDate(h.end);
         if (hs && he && d >= startOfDay(hs) && d <= startOfDay(he)) return false;
     }
     return true;
+}
+
+/**
+ * Returns true if a semester is currently active.
+ * Auto-detection: today is between semesterStart and semesterEnd.
+ * Falls back to manual isActive flag if no outer dates are set.
+ */
+export function isSemesterActive(semester) {
+    if (!semester) return false;
+    const semStart = toDate(semester.semesterStart);
+    const semEnd = toDate(semester.semesterEnd);
+    if (semStart && semEnd) {
+        const today = startOfDay(new Date());
+        return today >= startOfDay(semStart) && today <= startOfDay(semEnd);
+    }
+    // Fall back to manual isActive flag
+    return !!semester.isActive;
+}
+
+/**
+ * Returns the currently active semester from an array, using auto-detection.
+ */
+export function getActiveSemester(semesters = []) {
+    // Prefer auto-detected by date
+    const byDate = semesters.find(s => {
+        const start = toDate(s.semesterStart);
+        const end = toDate(s.semesterEnd);
+        if (!start || !end) return false;
+        const today = startOfDay(new Date());
+        return today >= startOfDay(start) && today <= startOfDay(end);
+    });
+    if (byDate) return byDate;
+    // Fall back to manual isActive
+    return semesters.find(s => s.isActive) || null;
 }
 
 // ===== Calendar Helpers =====

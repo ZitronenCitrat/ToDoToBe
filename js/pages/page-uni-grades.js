@@ -43,6 +43,26 @@ function gradeLabel(grade) {
     return grade <= 4.0 ? '✓ Bestanden' : '✗ Nicht bestanden';
 }
 
+function calcLPWeightedGPA(courses, exams, assignments) {
+    let weightedSum = 0;
+    let totalLP = 0;
+    let gradedCourseCount = 0;
+    courses.forEach(course => {
+        const courseExams = exams.filter(e => e.courseId === course.id);
+        const courseAssignments = assignments.filter(a => a.courseId === course.id);
+        const avg = calculateCourseAverage(courseExams, courseAssignments);
+        if (avg == null) return;
+        const lp = course.creditHours || 0;
+        if (lp > 0) {
+            weightedSum += avg * lp;
+            totalLP += lp;
+            gradedCourseCount++;
+        }
+    });
+    const gpa = totalLP > 0 ? weightedSum / totalLP : null;
+    return { gpa, gradedCourseCount };
+}
+
 function render() {
     const content = document.querySelector('#grades-content');
     if (!content) return;
@@ -51,14 +71,9 @@ function render() {
     const exams = appState.allExams;
     const assignments = appState.allAssignments;
 
-    // Overall average
-    const allGraded = [
-        ...exams.filter(e => e.grade != null),
-        ...assignments.filter(a => a.grade != null)
-    ];
-    const overallAvg = allGraded.length > 0
-        ? (allGraded.reduce((s, g) => s + (g.grade * (g.weight || 1)), 0) / allGraded.reduce((s, g) => s + (g.weight || 1), 0)).toFixed(2)
-        : null;
+    // LP-weighted overall GPA
+    const { gpa: overallGPA, gradedCourseCount } = calcLPWeightedGPA(courses, exams, assignments);
+    const overallAvg = overallGPA != null ? overallGPA.toFixed(2) : null;
 
     // Total LP earned
     const earnedLP = exams.filter(e => e.grade != null && e.grade <= 4.0)
@@ -72,7 +87,7 @@ function render() {
             <div>
                 <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Gesamtdurchschnitt</div>
                 <div style="font-size:36px;font-weight:700;color:var(--accent)">${overallAvg || '–'}</div>
-                <div style="font-size:12px;color:var(--text-tertiary)">${allGraded.length} bewertet</div>
+                <div style="font-size:12px;color:var(--text-tertiary)">LP-gewichtet · ${gradedCourseCount} Kurs${gradedCourseCount !== 1 ? 'e' : ''}</div>
             </div>
             <div>
                 <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Erworben</div>

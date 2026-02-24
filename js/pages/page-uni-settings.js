@@ -1,7 +1,7 @@
 import { appState, onStateChange } from '../app.js';
 import { onRouteChange, back } from '../router.js';
 import { addSemester, updateSemester, deleteSemester, setActiveSemester } from '../db.js';
-import { toDate, toInputDate, escapeHtml, escapeAttr } from '../utils.js';
+import { toDate, toInputDate, escapeHtml, escapeAttr, isSemesterActive } from '../utils.js';
 
 let initialized = false;
 
@@ -49,20 +49,32 @@ function render() {
     }
 
     list.innerHTML = semesters.map(sem => {
-        const start = toDate(sem.lectureStart);
-        const end = toDate(sem.lectureEnd);
-        const dateRange = start && end
-            ? `${start.toLocaleDateString('de-DE')} \u2013 ${end.toLocaleDateString('de-DE')}`
-            : 'Kein Zeitraum';
+        const semStart = toDate(sem.semesterStart);
+        const semEnd = toDate(sem.semesterEnd);
+        const lectStart = toDate(sem.lectureStart);
+        const lectEnd = toDate(sem.lectureEnd);
+
+        const semRange = semStart && semEnd
+            ? `${semStart.toLocaleDateString('de-DE')} \u2013 ${semEnd.toLocaleDateString('de-DE')}`
+            : null;
+        const lectRange = lectStart && lectEnd
+            ? `Vorlesungen: ${lectStart.toLocaleDateString('de-DE')} \u2013 ${lectEnd.toLocaleDateString('de-DE')}`
+            : null;
         const holidayCount = (sem.holidays || []).length;
+
+        // Auto-detect active status
+        const isAutoActive = isSemesterActive(sem);
+        const isActive = isAutoActive || !!sem.isActive;
+
         return `
         <div class="glass-sm p-4 mb-3">
             <div class="flex items-center justify-between mb-1">
                 <div style="font-size:15px;font-weight:600">${escapeHtml(sem.name)}
-                    ${sem.isActive ? '<span style="font-size:11px;background:var(--accent);color:#050505;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600">Aktiv</span>' : ''}
+                    ${isActive ? '<span style="font-size:11px;background:var(--accent);color:#050505;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600">Aktiv</span>' : ''}
+                    ${isAutoActive ? '<span style="font-size:10px;color:var(--text-tertiary);margin-left:4px">auto</span>' : ''}
                 </div>
                 <div class="flex gap-2">
-                    ${!sem.isActive ? `<button class="icon-btn activate-btn" data-id="${sem.id}" title="Aktivieren">
+                    ${!isActive ? `<button class="icon-btn activate-btn" data-id="${sem.id}" title="Aktivieren">
                         <span class="material-symbols-outlined" style="font-size:18px">check_circle</span>
                     </button>` : ''}
                     <button class="icon-btn edit-btn" data-id="${sem.id}">
@@ -73,7 +85,8 @@ function render() {
                     </button>
                 </div>
             </div>
-            <div style="font-size:13px;color:var(--text-secondary)">${dateRange}</div>
+            ${semRange ? `<div style="font-size:13px;color:var(--text-secondary)">${semRange}</div>` : ''}
+            ${lectRange ? `<div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${lectRange}</div>` : ''}
             ${holidayCount > 0 ? `<div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${holidayCount} Ferienperiode(n)</div>` : ''}
         </div>`;
     }).join('');
@@ -137,29 +150,45 @@ function openAddSemesterModal(existing = null) {
             <h2 class="text-lg font-semibold mb-4">${existing ? 'Semester bearbeiten' : 'Neues Semester'}</h2>
             <input type="text" id="sem-name" class="glass-input w-full mb-3"
                 placeholder="Semestername (z.B. WS 25/26)"
-                value="${existing ? existing.name : ''}">
-            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:6px">Vorlesungszeit</div>
+                value="${existing ? escapeAttr(existing.name) : ''}">
+
+            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:6px">Semester-Rahmen</div>
             <div class="flex gap-2 mb-3">
-                <input type="date" id="sem-lecture-start" class="glass-input flex-1"
-                    value="${existing ? toInputDate(existing.lectureStart) : ''}">
-                <input type="date" id="sem-lecture-end" class="glass-input flex-1"
-                    value="${existing ? toInputDate(existing.lectureEnd) : ''}">
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Beginn</div>
+                    <input type="date" id="sem-start" class="glass-input w-full"
+                        value="${existing ? toInputDate(existing.semesterStart) : ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Ende</div>
+                    <input type="date" id="sem-end" class="glass-input w-full"
+                        value="${existing ? toInputDate(existing.semesterEnd) : ''}">
+                </div>
             </div>
-            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:6px">Vorlesungsfreie Zeit</div>
+
+            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:6px">Vorlesungszeit (innerhalb des Semesters)</div>
             <div class="flex gap-2 mb-3">
-                <input type="date" id="sem-free-start" class="glass-input flex-1"
-                    value="${existing ? toInputDate(existing.lectureFreeStart) : ''}">
-                <input type="date" id="sem-free-end" class="glass-input flex-1"
-                    value="${existing ? toInputDate(existing.lectureFreeEnd) : ''}">
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Start</div>
+                    <input type="date" id="sem-lecture-start" class="glass-input w-full"
+                        value="${existing ? toInputDate(existing.lectureStart) : ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Ende</div>
+                    <input type="date" id="sem-lecture-end" class="glass-input w-full"
+                        value="${existing ? toInputDate(existing.lectureEnd) : ''}">
+                </div>
             </div>
+
             <div class="flex items-center justify-between mb-2">
-                <div style="font-size:13px;color:var(--text-tertiary)">Ferien</div>
+                <div style="font-size:13px;color:var(--text-tertiary)">Ferien (innerhalb Vorlesungszeit)</div>
                 <button id="sem-add-holiday" class="btn-ghost" style="padding:6px 12px;font-size:13px">+ Hinzuf\u00fcgen</button>
             </div>
             <div id="sem-holidays">${renderHolidayRows()}</div>
-            <label class="flex items-center gap-3 mb-4 mt-2" style="cursor:pointer">
+
+            <label class="flex items-center gap-3 mb-4 mt-3" style="cursor:pointer">
                 <input type="checkbox" id="sem-active" ${existing?.isActive ? 'checked' : ''}>
-                <span style="font-size:14px">Als aktives Semester setzen</span>
+                <span style="font-size:14px">Manuell als aktiv markieren (Override)</span>
             </label>
             <button id="sem-save" class="btn-accent w-full">${existing ? 'Speichern' : 'Hinzuf\u00fcgen'}</button>
         </div>`;
@@ -208,10 +237,10 @@ function openAddSemesterModal(existing = null) {
 
         const data = {
             name,
+            semesterStart: ts(modal.querySelector('#sem-start').value),
+            semesterEnd: ts(modal.querySelector('#sem-end').value),
             lectureStart: ts(modal.querySelector('#sem-lecture-start').value),
             lectureEnd: ts(modal.querySelector('#sem-lecture-end').value),
-            lectureFreeStart: ts(modal.querySelector('#sem-free-start').value),
-            lectureFreeEnd: ts(modal.querySelector('#sem-free-end').value),
             holidays: holidays
                 .filter(h => h.start && h.end)
                 .map(h => ({ name: h.name || '', start: ts(h.start), end: ts(h.end) })),

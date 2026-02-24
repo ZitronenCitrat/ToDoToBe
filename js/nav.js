@@ -2,9 +2,14 @@ import { navigate } from './router.js';
 import { appState, onStateChange } from './app.js';
 
 const NAV_CONFIGS = {
+    home: [
+        { spacer: true },
+    ],
+    calendar: [
+        { spacer: true },
+    ],
     todo: [
         { route: 'today',    icon: 'today',          label: 'Heute',     badgeId: 'badge-today' },
-        { route: 'calendar', icon: 'calendar_month',  label: 'Kalender'  },
         { spacer: true },
         { route: 'projects', icon: 'folder_open',     label: 'Projekte'  },
         { route: 'stats',    icon: 'bar_chart',       label: 'Statistik' },

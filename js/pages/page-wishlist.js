@@ -1,11 +1,11 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange } from '../router.js';
-import { formatPrice, escapeHtml } from '../utils.js';
-import { addWishlistItem, toggleWishlistItem, deleteWishlistItem } from '../db.js';
+import { formatPrice, escapeHtml, escapeAttr, toInputDate, toDate } from '../utils.js';
+import { addWishlistItem, updateWishlistItem, toggleWishlistItem, deleteWishlistItem } from '../db.js';
 
 let initialized = false;
 let currentCategory = 'all';
-let currentSort = 'priority';
+let currentSort = 'nutzen';
 
 const CATEGORIES = ['Film', 'Spiel', 'Hardware', 'Buch', 'Kleidung', 'Sonstiges'];
 const CATEGORY_ICONS = {
@@ -35,9 +35,9 @@ export function initPageWishlist() {
         <div class="px-5 flex-1" id="wishlist-content"></div>
     `;
 
-    container.querySelector('#wishlist-add-btn').addEventListener('click', openAddWishlistModal);
+    container.querySelector('#wishlist-add-btn').addEventListener('click', () => openWishlistModal());
     container.querySelector('#wishlist-sort-btn').addEventListener('click', cycleSort);
-    registerFabAction('wishlist', openAddWishlistModal);
+    registerFabAction('wishlist', () => openWishlistModal());
 
     onStateChange(() => { if (isActive()) render(); });
     onRouteChange((route) => { if (route === 'wishlist') render(); });
@@ -46,7 +46,7 @@ export function initPageWishlist() {
 function isActive() { return window.location.hash.slice(1).split('/')[0] === 'wishlist'; }
 
 function cycleSort() {
-    const sorts = ['priority', 'alpha', 'price'];
+    const sorts = ['nutzen', 'alpha', 'price'];
     const idx = sorts.indexOf(currentSort);
     currentSort = sorts[(idx + 1) % sorts.length];
     render();
@@ -64,7 +64,7 @@ function renderFilters() {
     const filters = [{ key: 'all', label: 'Alle' }, ...CATEGORIES.map(c => ({ key: c, label: c }))];
 
     filtersEl.innerHTML = filters.map(f =>
-        `<button class="tab-btn ${currentCategory === f.key ? 'active' : ''}" data-filter="${f.key}">${f.label}</button>`
+        `<button class="tab-btn ${currentCategory === f.key ? 'active' : ''}" data-filter="${escapeAttr(f.key)}">${escapeHtml(f.label)}</button>`
     ).join('');
 
     filtersEl.querySelectorAll('.tab-btn').forEach(btn => {
@@ -81,7 +81,7 @@ function renderItems() {
 
     let items = [...appState.allWishlistItems];
 
-    // Filter
+    // Filter by category
     if (currentCategory !== 'all') {
         items = items.filter(i => i.category === currentCategory);
     }
@@ -90,8 +90,8 @@ function renderItems() {
     const purchased = items.filter(i => i.purchased);
 
     // Sort active items
-    if (currentSort === 'priority') {
-        active.sort((a, b) => (a.priority || 4) - (b.priority || 4));
+    if (currentSort === 'nutzen') {
+        active.sort((a, b) => (b.nutzen || 0) - (a.nutzen || 0));
     } else if (currentSort === 'alpha') {
         active.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     } else if (currentSort === 'price') {
@@ -106,7 +106,7 @@ function renderItems() {
         return;
     }
 
-    const sortLabel = currentSort === 'priority' ? 'Priorität' : currentSort === 'alpha' ? 'A–Z' : 'Preis';
+    const sortLabel = currentSort === 'nutzen' ? 'Nutzen' : currentSort === 'alpha' ? 'A–Z' : 'Preis';
 
     let html = `<div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">Sortierung: ${sortLabel}</div>`;
 
@@ -129,7 +129,7 @@ function renderItems() {
 
     content.innerHTML = html;
 
-    // Wire events
+    // Wire purchase toggle
     content.querySelectorAll('[data-toggle-purchase]').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -138,6 +138,16 @@ function renderItems() {
         });
     });
 
+    // Wire edit
+    content.querySelectorAll('[data-edit-wish]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const item = appState.allWishlistItems.find(i => i.id === el.dataset.editWish);
+            if (item) openWishlistModal(item);
+        });
+    });
+
+    // Wire delete
     content.querySelectorAll('[data-delete-wish]').forEach(el => {
         el.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -157,97 +167,174 @@ function renderItems() {
     }
 }
 
+function renderStars(nutzen) {
+    const n = nutzen || 0;
+    return Array.from({ length: 5 }, (_, i) =>
+        `<span style="color:${i < n ? '#a855f7' : 'var(--text-tertiary)'}">★</span>`
+    ).join('');
+}
+
 function renderWishlistCard(item, isPurchased = false) {
     const icon = CATEGORY_ICONS[item.category] || 'category';
-    const priorityClass = !isPurchased && item.priority && item.priority < 4 ? `priority-${item.priority}` : '';
-    const hasSavings = item.originalPrice != null && item.price != null && item.originalPrice > item.price;
-    const savings = hasSavings ? item.originalPrice - item.price : 0;
-    const savingsPct = hasSavings ? Math.round((savings / item.originalPrice) * 100) : 0;
-    const savingsBadge = hasSavings
-        ? `<span class="savings-badge">\u2212${formatPrice(savings)} (${savingsPct}%)</span>`
-        : '';
+    const titleStyle = isPurchased ? 'text-decoration:line-through;color:var(--text-tertiary)' : '';
 
-    return `<div class="wishlist-card glass-sm p-3 mb-2 flex items-center gap-3 ${priorityClass}" data-id="${item.id}">
-        <div class="todo-checkbox ${isPurchased ? 'checked' : ''}" data-toggle-purchase="${item.id}" style="cursor:pointer;flex-shrink:0"></div>
+    // Date display
+    let dateStr = '';
+    if (item.date) {
+        let d;
+        if (typeof item.date === 'string') {
+            d = new Date(item.date + 'T00:00:00');
+        } else {
+            d = toDate(item.date);
+        }
+        if (d && !isNaN(d)) {
+            dateStr = d.toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+    }
+
+    return `<div class="wishlist-card glass-sm p-3 mb-2 flex items-center gap-3" data-id="${escapeAttr(item.id)}">
+        <div class="todo-checkbox ${isPurchased ? 'checked' : ''}" data-toggle-purchase="${escapeAttr(item.id)}" style="cursor:pointer;flex-shrink:0"></div>
         <div class="flex-1 min-w-0">
-            <div style="font-size:14px;font-weight:500;${isPurchased ? 'text-decoration:line-through;color:var(--text-tertiary)' : ''}">${escapeHtml(item.title)}</div>
+            <div style="font-size:14px;font-weight:500;${titleStyle}">${escapeHtml(item.title)}</div>
             <div class="flex items-center gap-2 mt-1 flex-wrap">
                 <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surface-hover);color:var(--text-secondary)">
                     <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">${icon}</span>
                     ${escapeHtml(item.category || 'Sonstiges')}
                 </span>
                 ${item.price != null ? `<span style="font-size:12px;color:var(--accent);font-weight:600">${formatPrice(item.price)}</span>` : ''}
-                ${savingsBadge}
+                <span style="font-size:13px;letter-spacing:1px">${renderStars(item.nutzen)}</span>
+                ${dateStr ? `<span style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(dateStr)}</span>` : ''}
             </div>
         </div>
-        <button class="icon-btn" data-delete-wish="${item.id}" style="width:28px;height:28px;border:none;background:none">
-            <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-tertiary)">close</span>
-        </button>
+        <div class="flex gap-1">
+            <button class="icon-btn" data-edit-wish="${escapeAttr(item.id)}" style="width:28px;height:28px">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-secondary)">edit</span>
+            </button>
+            <button class="icon-btn" data-delete-wish="${escapeAttr(item.id)}" style="width:28px;height:28px">
+                <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-tertiary)">close</span>
+            </button>
+        </div>
     </div>`;
 }
 
-function openAddWishlistModal() {
-    const existing = document.getElementById('wishlist-add-modal');
-    if (existing) existing.remove();
+function openWishlistModal(existing = null) {
+    const old = document.getElementById('wishlist-modal');
+    if (old) old.remove();
 
     const modal = document.createElement('div');
-    modal.id = 'wishlist-add-modal';
+    modal.id = 'wishlist-modal';
     modal.className = 'modal-overlay';
+
+    const currentNutzen = existing?.nutzen ?? 3;
+
+    // Build star rating HTML (will be wired after append)
+    function starsHtml(selected) {
+        return Array.from({ length: 5 }, (_, i) =>
+            `<button class="wish-star-btn" data-star="${i + 1}" type="button" style="
+                background:none;border:none;cursor:pointer;font-size:28px;padding:2px 4px;
+                color:${i < selected ? '#a855f7' : 'var(--text-tertiary)'};
+                transition:color 0.15s;
+            ">★</button>`
+        ).join('');
+    }
+
+    // Date pre-fill
+    let existingDate = '';
+    if (existing?.date) {
+        if (typeof existing.date === 'string') {
+            existingDate = existing.date;
+        } else {
+            existingDate = toInputDate(existing.date) || '';
+        }
+    }
+
     modal.innerHTML = `
         <div class="modal-backdrop"></div>
         <div class="modal-sheet">
             <div class="modal-handle"></div>
-            <h2 class="text-lg font-semibold mb-4">Neuer Wunsch</h2>
-            <input type="text" id="wish-title" class="glass-input w-full mb-3" placeholder="Titel">
+            <h2 class="text-lg font-semibold mb-4">${existing ? 'Wunsch bearbeiten' : 'Neuer Wunsch'}</h2>
+
+            <input type="text" id="wish-title" class="glass-input w-full mb-3"
+                placeholder="Titel" value="${existing ? escapeAttr(existing.title || '') : ''}">
+
             <select id="wish-category" class="glass-select w-full mb-3">
-                ${CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                ${CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${existing?.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
             </select>
+
             <div class="flex gap-2 mb-3">
-                <input type="number" id="wish-price" class="glass-input flex-1" placeholder="Aktueller Preis (€)" step="0.01" min="0">
-                <input type="number" id="wish-original-price" class="glass-input flex-1" placeholder="Originalpreis (€)" step="0.01" min="0">
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Preis (€)</div>
+                    <input type="number" id="wish-price" class="glass-input w-full"
+                        placeholder="0.00" step="0.01" min="0"
+                        value="${existing?.price != null ? existing.price : ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
+                    <input type="date" id="wish-date" class="glass-input w-full"
+                        value="${existingDate}">
+                </div>
             </div>
-            <select id="wish-nutzen" class="glass-select w-full mb-3">
-                <option value="2">Nutzen: Niedrig</option>
-                <option value="1">Nutzen: Hoch</option>
-            </select>
-            <div class="flex gap-2 mb-3 flex-wrap" id="wish-priority">
-                <button data-priority="1" class="priority-chip p1">Dringend</button>
-                <button data-priority="2" class="priority-chip p2">Hoch</button>
-                <button data-priority="3" class="priority-chip p3">Mittel</button>
-                <button data-priority="4" class="priority-chip p4 active">Keine</button>
+
+            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:8px">Nutzen (1–5 Sterne)</div>
+            <div id="wish-stars" class="flex justify-center gap-1 mb-4">
+                ${starsHtml(currentNutzen)}
             </div>
-            <textarea id="wish-notes" class="glass-textarea mb-3" placeholder="Notizen…" rows="2"></textarea>
-            <input type="url" id="wish-url" class="glass-input w-full mb-4" placeholder="URL (optional)">
-            <button id="wish-save" class="btn-accent w-full">Hinzufügen</button>
+            <input type="hidden" id="wish-nutzen" value="${currentNutzen}">
+
+            <textarea id="wish-notes" class="glass-textarea mb-3"
+                placeholder="Notizen…" rows="2">${existing ? escapeHtml(existing.notes || '') : ''}</textarea>
+            <input type="url" id="wish-url" class="glass-input w-full mb-4"
+                placeholder="URL (optional)" value="${existing ? escapeAttr(existing.url || '') : ''}">
+
+            <button id="wish-save" class="btn-accent w-full">${existing ? 'Speichern' : 'Hinzufügen'}</button>
         </div>
     `;
     document.body.appendChild(modal);
 
-    modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.remove());
+    // Wire star rating
+    const starsContainer = modal.querySelector('#wish-stars');
+    const nutzenInput = modal.querySelector('#wish-nutzen');
 
-    modal.querySelectorAll('#wish-priority [data-priority]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            modal.querySelectorAll('#wish-priority [data-priority]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+    function updateStars(selected) {
+        nutzenInput.value = selected;
+        starsContainer.querySelectorAll('.wish-star-btn').forEach((btn, i) => {
+            btn.style.color = i < selected ? '#a855f7' : 'var(--text-tertiary)';
         });
+    }
+
+    starsContainer.querySelectorAll('.wish-star-btn').forEach(btn => {
+        btn.addEventListener('click', () => updateStars(parseInt(btn.dataset.star)));
+        btn.addEventListener('mouseenter', () => {
+            starsContainer.querySelectorAll('.wish-star-btn').forEach((b, i) => {
+                b.style.color = i < parseInt(btn.dataset.star) ? '#a855f7' : 'var(--text-tertiary)';
+            });
+        });
+        btn.addEventListener('mouseleave', () => updateStars(parseInt(nutzenInput.value)));
     });
+
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.remove());
 
     modal.querySelector('#wish-save').addEventListener('click', async () => {
         const title = modal.querySelector('#wish-title').value.trim();
         if (!title) return;
         const priceVal = modal.querySelector('#wish-price').value;
-        const originalPriceVal = modal.querySelector('#wish-original-price').value;
-        const priorityBtn = modal.querySelector('#wish-priority .active');
-        await addWishlistItem({
+        const dateVal = modal.querySelector('#wish-date').value;
+
+        const data = {
             title,
             category: modal.querySelector('#wish-category').value,
             price: priceVal ? parseFloat(priceVal) : null,
-            originalPrice: originalPriceVal ? parseFloat(originalPriceVal) : null,
-            nutzen: parseInt(modal.querySelector('#wish-nutzen').value) || 2,
-            priority: priorityBtn ? parseInt(priorityBtn.dataset.priority) : 4,
+            date: dateVal || null,
+            nutzen: parseInt(nutzenInput.value) || 3,
             notes: modal.querySelector('#wish-notes').value,
             url: modal.querySelector('#wish-url').value.trim()
-        });
+        };
+
+        if (existing) {
+            await updateWishlistItem(existing.id, data);
+        } else {
+            await addWishlistItem(data);
+        }
         modal.remove();
     });
 
