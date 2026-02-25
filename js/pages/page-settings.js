@@ -150,8 +150,8 @@ export function initPageSettings() {
         if (appState.user) openPasswordModal(appState.user);
     });
 
-    // Google Calendar
-    initGcal((connected) => {
+    // Google Calendar — pass userId so token can be stored/loaded from Firestore
+    initGcal(appState.user?.uid, (connected) => {
         renderGcalStatus(container, connected);
     });
 

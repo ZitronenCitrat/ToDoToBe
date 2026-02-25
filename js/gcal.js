@@ -3,35 +3,60 @@
 const GCAL_CLIENT_ID = '556251801382-0ngula7hhutjtg5gl41opccltfs4i8ig.apps.googleusercontent.com';
 // ======================================================
 
-const GCAL_SCOPE     = 'https://www.googleapis.com/auth/calendar';
-const GCAL_API_BASE  = 'https://www.googleapis.com/calendar/v3';
-const GCAL_KEY_TOKEN = 'gcal-token';
-const GCAL_KEY_IDS   = 'gcal-ids';
-const GCAL_KEY_CONN  = 'gcal-connected';
+const GCAL_SCOPE    = 'https://www.googleapis.com/auth/calendar';
+const GCAL_API_BASE = 'https://www.googleapis.com/calendar/v3';
 
 let tokenClient  = null;
 let accessToken  = null;
 let tokenExpiry  = 0;
-let onConnectCb  = null;  // callback(connected: boolean)
+let onConnectCb  = null;   // callback(connected: boolean)
+let currentUserId = null;  // set by initGcal(userId, ...)
+let gcalIdsCache  = {};    // in-memory cache of entityKey → gcalEventId
+let gcalTokenLoaded = false;
+let wasConnected = false;  // true if Firestore shows the user previously connected
 
 // ===== Init =====
 
-export function initGcal(onStatusChange) {
-    if (onStatusChange) onConnectCb = onStatusChange;
+/**
+ * Initialize GCal for a given user.
+ * First call loads the token from Firestore; subsequent calls just update the callback.
+ * Now async — awaits Firestore token restoration.
+ */
+export async function initGcal(userId, onStatusChange) {
+    if (onStatusChange !== undefined) onConnectCb = onStatusChange;
+    if (userId) currentUserId = userId;
 
-    // Restore token from localStorage if still valid
-    try {
-        const stored = localStorage.getItem(GCAL_KEY_TOKEN);
-        if (stored) {
-            const { token, expiry } = JSON.parse(stored);
-            if (Date.now() < expiry - 60_000) {   // 1-min buffer
-                accessToken = token;
-                tokenExpiry = expiry;
-            } else {
-                localStorage.removeItem(GCAL_KEY_TOKEN);
+    if (!currentUserId) return;
+
+    if (!gcalTokenLoaded) {
+        gcalTokenLoaded = true;
+        // Restore token + gcalIds from Firestore user doc
+        try {
+            const { db } = await import('./app.js');
+            const { getDoc, doc: fsDoc } =
+                await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
+            const snap = await getDoc(fsDoc(db, 'users', currentUserId));
+            if (snap.exists()) {
+                const data = snap.data();
+                if (data.gcalToken) {
+                    const { token, expiry } = data.gcalToken;
+                    if (Date.now() < expiry - 60_000) {
+                        accessToken = token;
+                        tokenExpiry = expiry;
+                    }
+                }
+                gcalIdsCache = data.gcalIds || {};
+                wasConnected = !!data.gcalConnected;
             }
+        } catch (e) {
+            console.warn('[gcal] Could not restore token from Firestore:', e);
         }
-    } catch (e) { /* ignore parse errors */ }
+        // Notify whoever registered a callback by the time the load finishes
+        onConnectCb?.(isGcalConnected());
+    } else if (onStatusChange !== undefined) {
+        // Token already loaded — notify the newly registered callback immediately
+        onConnectCb?.(isGcalConnected());
+    }
 }
 
 function getTokenClient() {
@@ -49,7 +74,7 @@ function getTokenClient() {
     return tokenClient;
 }
 
-function _handleTokenResponse(response) {
+async function _handleTokenResponse(response) {
     if (response.error) {
         console.error('[gcal] Auth error:', response.error);
         onConnectCb?.(false);
@@ -57,8 +82,23 @@ function _handleTokenResponse(response) {
     }
     accessToken = response.access_token;
     tokenExpiry = Date.now() + (response.expires_in * 1000);
-    localStorage.setItem(GCAL_KEY_TOKEN, JSON.stringify({ token: accessToken, expiry: tokenExpiry }));
-    localStorage.setItem(GCAL_KEY_CONN, 'true');
+    wasConnected = true;
+
+    // Persist token + connected flag to Firestore user doc
+    if (currentUserId) {
+        try {
+            const { db } = await import('./app.js');
+            const { updateDoc, doc: fsDoc } =
+                await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
+            await updateDoc(fsDoc(db, 'users', currentUserId), {
+                gcalToken: { token: accessToken, expiry: tokenExpiry },
+                gcalConnected: true,
+            });
+        } catch (e) {
+            console.warn('[gcal] Could not save token to Firestore:', e);
+        }
+    }
+
     onConnectCb?.(true);
 
     // Sync all existing data on first connect
@@ -68,11 +108,7 @@ function _handleTokenResponse(response) {
 // ===== Public API =====
 
 export function isGcalConnected() {
-    if (accessToken && Date.now() < tokenExpiry - 60_000) return true;
-    // Check localStorage
-    if (localStorage.getItem(GCAL_KEY_CONN) !== 'true') return false;
-    // Token may have expired — caller should re-request
-    return false;
+    return Boolean(accessToken) && Date.now() < tokenExpiry - 60_000;
 }
 
 export function isGcalConfigured() {
@@ -88,42 +124,61 @@ export function connectGcal() {
     client.requestAccessToken({ prompt: 'consent' });
 }
 
-export function disconnectGcal() {
+export async function disconnectGcal() {
     if (accessToken) {
         try { google.accounts.oauth2.revoke(accessToken, () => {}); } catch (e) {}
     }
     accessToken = null;
     tokenExpiry = 0;
-    localStorage.removeItem(GCAL_KEY_TOKEN);
-    localStorage.removeItem(GCAL_KEY_CONN);
-    // Keep GCAL_KEY_IDS so we don't re-create events if user reconnects
+    wasConnected = false;
+
+    // Clear token from Firestore (keep gcalIds so we can PATCH instead of re-create on reconnect)
+    if (currentUserId) {
+        try {
+            const { db } = await import('./app.js');
+            const { updateDoc, doc: fsDoc, deleteField } =
+                await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
+            await updateDoc(fsDoc(db, 'users', currentUserId), {
+                gcalToken: deleteField(),
+                gcalConnected: false,
+            });
+        } catch (e) {
+            console.warn('[gcal] Could not clear token from Firestore:', e);
+        }
+    }
+
     onConnectCb?.(false);
 }
 
 /** Refresh an expired token silently (no prompt). */
 export function refreshTokenSilent() {
     if (isGcalConnected()) return;
-    if (localStorage.getItem(GCAL_KEY_CONN) !== 'true') return;
+    if (!wasConnected) return;
     const client = getTokenClient();
     if (!client) return;
     client.requestAccessToken({ prompt: '' });
 }
 
-// ===== gcal-id mapping (localStorage) =====
+// ===== gcal-id mapping (in-memory + Firestore) =====
 
 function getGcalId(entityKey) {
-    try {
-        const map = JSON.parse(localStorage.getItem(GCAL_KEY_IDS) || '{}');
-        return map[entityKey] || null;
-    } catch { return null; }
+    return gcalIdsCache[entityKey] || null;
 }
 
-function setGcalId(entityKey, gcalId) {
+async function setGcalId(entityKey, gcalId) {
+    gcalIdsCache[entityKey] = gcalId;
+    if (!currentUserId) return;
     try {
-        const map = JSON.parse(localStorage.getItem(GCAL_KEY_IDS) || '{}');
-        map[entityKey] = gcalId;
-        localStorage.setItem(GCAL_KEY_IDS, JSON.stringify(map));
-    } catch { /* ignore */ }
+        const { db } = await import('./app.js');
+        const { updateDoc, doc: fsDoc } =
+            await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
+        // Dot notation updates a single key inside the gcalIds map
+        await updateDoc(fsDoc(db, 'users', currentUserId), {
+            [`gcalIds.${entityKey}`]: gcalId,
+        });
+    } catch (e) {
+        console.warn('[gcal] Could not save gcalId to Firestore:', e);
+    }
 }
 
 // ===== REST helpers =====
@@ -148,7 +203,6 @@ async function calendarRequest(method, path, body = null) {
         if (res.status === 401) {
             // Token revoked externally
             accessToken = null;
-            localStorage.removeItem(GCAL_KEY_TOKEN);
             onConnectCb?.(false);
             return null;
         }
@@ -172,7 +226,6 @@ function todoToGcalEvent(todo) {
 }
 
 function addMinutesToDateStr(dateStr, timeStr, minutesToAdd) {
-    const [h, m] = timeStr.split(':').map(Number);
     const base = new Date(`${dateStr}T${timeStr}:00`);
     base.setMinutes(base.getMinutes() + minutesToAdd);
     const pad = (n) => String(n).padStart(2, '0');
@@ -184,7 +237,10 @@ function eventToGcalEvent(ev) {
     if (!dateStr) return null;
     if (ev.time) {
         const dtStart = `${dateStr}T${ev.time}:00`;
-        const dtEnd = addMinutesToDateStr(dateStr, ev.time, 60); // +1 hour
+        // Use actual endTime if set, otherwise default to +1 hour
+        const dtEnd = ev.endTime
+            ? `${dateStr}T${ev.endTime}:00`
+            : addMinutesToDateStr(dateStr, ev.time, 60);
         return {
             summary: ev.title || 'Termin',
             description: ev.category || '',
@@ -255,10 +311,7 @@ function wishToGcalEvent(wish) {
 function todoDateStr(dueDate) {
     if (!dueDate) return null;
     if (typeof dueDate === 'string') return dueDate.slice(0, 10);
-    if (dueDate.toDate) {
-        const d = dueDate.toDate();
-        return d.toISOString().slice(0, 10);
-    }
+    if (dueDate.toDate) return dueDate.toDate().toISOString().slice(0, 10);
     if (dueDate instanceof Date) return dueDate.toISOString().slice(0, 10);
     return null;
 }
@@ -304,7 +357,7 @@ export async function syncEntityToGcal(type, entity, meta = {}) {
         // Create new event
         const result = await calendarRequest('POST', '/calendars/primary/events', gcalEvent);
         if (result?.id) {
-            setGcalId(key, result.id);
+            await setGcalId(key, result.id);
         }
     }
 }

@@ -38,20 +38,37 @@ export async function initUser(user) {
             settings: { theme: 'dark', notifications: false },
             createdAt: Timestamp.now()
         });
-
-        await addDoc(collection(db, 'users', user.uid, 'lists'), {
-            name: 'Eingang',
-            icon: '📥',
-            color: '#007aff',
-            sortOrder: 0,
-            isDefault: true,
-            createdAt: Timestamp.now()
-        });
-
+        // Inbox list creation deferred to createDefaultData() — called after access is granted
         return { isNewUser: true };
     }
 
     return { isNewUser: false };
+}
+
+/** Creates default data (inbox list) for a new user after access is granted. Safe to call for existing users (no-op). */
+export async function createDefaultData(userId) {
+    const listsRef = collection(db, 'users', userId, 'lists');
+    const snap = await getDocs(listsRef);
+    if (snap.empty) {
+        await addDoc(listsRef, {
+            name: 'Eingang', icon: '📥', color: '#007aff',
+            sortOrder: 0, isDefault: true, createdAt: Timestamp.now()
+        });
+    }
+}
+
+/** Returns true if the user has allowedAccess: true in their Firestore doc. */
+export async function checkAllowedAccess(userId) {
+    try {
+        const snap = await getDoc(doc(db, 'users', userId));
+        return snap.exists() && snap.data().allowedAccess === true;
+    } catch { return false; }
+}
+
+/** Writes allowedAccess: true + accessHash to the user doc.
+ *  Succeeds only if no config/appAccess doc exists, or the hash matches. */
+export async function grantAccess(userId, accessHash) {
+    await updateDoc(doc(db, 'users', userId), { allowedAccess: true, accessHash });
 }
 
 // ===== User Settings =====
@@ -641,13 +658,14 @@ export async function addEvent(data) {
         title: data.title || '',
         date: dateTs,
         time: data.time || '',
+        endTime: data.endTime || '',
         category: data.category || 'Sonstiges',
         recurrence: data.recurrence || 'none', // 'none' | 'daily' | 'weekly' | 'monthly'
         notes: data.notes || '',
         color: data.color || null,
         createdAt: Timestamp.now()
     });
-    gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, category: data.category });
+    gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, endTime: data.endTime, category: data.category });
     return ref;
 }
 
@@ -656,7 +674,7 @@ export async function updateEvent(eventId, updates) {
         updates.date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : null;
     }
     await updateDoc(userDoc('events', eventId), updates);
-    if (updates.date !== undefined || updates.title !== undefined || updates.time !== undefined) {
+    if (updates.date !== undefined || updates.title !== undefined || updates.time !== undefined || updates.endTime !== undefined) {
         gcalSync('event', eventId, updates);
     }
 }

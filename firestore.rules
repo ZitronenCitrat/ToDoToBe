@@ -2,22 +2,51 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Public config (access gate hash) — readable by anyone, never writable from client
+    // Returns true when the user has allowedAccess: true in their user doc,
+    // OR when no config/appAccess password is configured (open mode).
+    function isAccessGranted(userId) {
+      return !exists(/databases/$(database)/documents/config/appAccess)
+          || get(/databases/$(database)/documents/users/$(userId)).data.allowedAccess == true;
+    }
+
+    // Config is never readable from the client — hash stays server-side only.
+    // Firestore rules engine can still use get(config/appAccess) internally.
     match /config/{docId} {
-      allow read:  if true;
+      allow read:  if false;
       allow write: if false;
     }
 
-    // Each user can only access their own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Reading own user doc is always allowed (used to check allowedAccess status)
+      allow read: if request.auth != null && request.auth.uid == userId;
 
+      // Creating own user doc (new user, allowedAccess not yet set)
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      // Updating own user doc:
+      // Either the user already has access (normal updates like settings, gcalToken),
+      // OR the user is granting access and the accessHash matches the configured hash.
+      allow update: if request.auth != null && request.auth.uid == userId && (
+        isAccessGranted(userId)
+        || (
+          request.resource.data.allowedAccess == true
+          && (
+            !exists(/databases/$(database)/documents/config/appAccess)
+            || request.resource.data.accessHash
+               == get(/databases/$(database)/documents/config/appAccess).data.hash
+          )
+        )
+      );
+
+      // Sub-collections (todos, lists, events, exams, etc.) require access to be granted
       match /{collection}/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null
+          && request.auth.uid == userId
+          && isAccessGranted(userId);
       }
     }
 
-    // Deny all other access
+    // Deny everything else
     match /{document=**} {
       allow read, write: if false;
     }

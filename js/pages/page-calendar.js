@@ -417,6 +417,9 @@ function renderDayItems() {
         hasContent = true;
         sectionLabel('Termine', '#22c55e');
         events.forEach(ev => {
+            const timeRange = ev.time
+                ? (ev.endTime ? `${ev.time}–${ev.endTime}` : ev.time)
+                : '';
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
             card.style.cssText = 'border-left:3px solid #22c55e';
@@ -424,7 +427,7 @@ function renderDayItems() {
                 <span class="material-symbols-outlined" style="font-size:20px;color:#22c55e;flex-shrink:0">event</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(ev.title)}</div>
-                    <div style="font-size:11px;color:var(--text-tertiary)">${ev.time ? ev.time : ''}${ev.time && ev.category ? ' · ' : ''}${ev.category ? escapeHtml(ev.category) : ''}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary)">${timeRange ? escapeHtml(timeRange) : ''}${timeRange && ev.category ? ' · ' : ''}${ev.category ? escapeHtml(ev.category) : ''}</div>
                 </div>
                 <button class="icon-btn event-edit-btn" data-id="${escapeAttr(ev.id)}" style="width:28px;height:28px;flex-shrink:0">
                     <span class="material-symbols-outlined" style="font-size:15px">edit</span>
@@ -497,13 +500,17 @@ function openAddEventModal(defaultDate, existing = null) {
             <input type="text" id="event-title" class="glass-input w-full mb-3"
                 placeholder="Titel" value="${existing ? escapeAttr(existing.title || '') : ''}">
             <div class="flex gap-2 mb-3">
-                <div class="flex-1">
+                <div style="flex:1.3">
                     <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
                     <input type="date" id="event-date" class="glass-input w-full" value="${dateStr || ''}">
                 </div>
                 <div class="flex-1">
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Uhrzeit</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Von</div>
                     <input type="time" id="event-time" class="glass-input w-full" value="${existing?.time || ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Bis</div>
+                    <input type="time" id="event-end-time" class="glass-input w-full" value="${existing?.endTime || ''}">
                 </div>
             </div>
             <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Kategorie</div>
@@ -534,6 +541,7 @@ function openAddEventModal(defaultDate, existing = null) {
             title,
             date: modal.querySelector('#event-date').value || null,
             time: modal.querySelector('#event-time').value || null,
+            endTime: modal.querySelector('#event-end-time').value || null,
             category: modal.querySelector('#event-category').value || null,
             recurrence: modal.querySelector('#event-recurrence').value || null,
         };

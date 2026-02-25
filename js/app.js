@@ -110,9 +110,6 @@ function initModeTabs() {
 
 // ===== Access Gate =====
 
-const ACCESS_UNLOCKED_KEY = 'todotobe-access-unlocked';
-const ACCESS_FAILS_KEY    = 'todotobe-access-fails';
-const ACCESS_LOCKOUT_KEY  = 'todotobe-access-lockout';
 // Backoff in seconds after 5+ failures: 30s, 60s, 5min, 15min, 1hr
 const BACKOFF_DELAYS = [30, 60, 300, 900, 3600];
 
@@ -122,97 +119,96 @@ async function sha256(message) {
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function initAccessGate() {
-    // Already unlocked (persisted across sessions) — skip gate
-    if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') return;
+/**
+ * Shows the access gate overlay (post-login) and resolves when the user
+ * successfully grants access via Firestore write validation.
+ * If no config/appAccess doc exists in Firestore, any code succeeds.
+ */
+function showAccessGate(user) {
+    return new Promise((resolve) => {
+        const gate      = document.getElementById('access-gate');
+        const input     = document.getElementById('access-code-input');
+        const submitBtn = document.getElementById('access-submit-btn');
+        const errorEl   = document.getElementById('access-error');
+        const lockoutEl = document.getElementById('access-lockout');
 
-    // Fetch the SHA-256 hash from Firestore config/appAccess (unauthenticated read)
-    let storedHash = null;
-    try {
-        const { getDoc, doc } = await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
-        const snap = await getDoc(doc(db, 'config', 'appAccess'));
-        if (snap.exists()) storedHash = snap.data().hash || null;
-    } catch (e) {
-        console.warn('Access gate: could not load config, bypassing gate', e);
-    }
+        // Hide auth screen, show gate
+        authScreen.classList.add('hidden');
+        gate.classList.remove('hidden');
+        errorEl.classList.add('hidden');
+        input.value = '';
+        setTimeout(() => input.focus(), 150);
 
-    // No password configured — skip gate silently
-    if (!storedHash) {
-        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
-        return;
-    }
+        // Per-user lockout keys
+        const FAILS_KEY   = `todotobe-access-fails-${user.uid}`;
+        const LOCKOUT_KEY = `todotobe-access-lockout-${user.uid}`;
 
-    // Show the gate
-    const gate      = document.getElementById('access-gate');
-    const input     = document.getElementById('access-code-input');
-    const submitBtn = document.getElementById('access-submit-btn');
-    const errorEl   = document.getElementById('access-error');
-    const lockoutEl = document.getElementById('access-lockout');
-    gate.classList.remove('hidden');
+        let lockoutTimer = null;
 
-    let lockoutTimer = null;
-
-    function getLockoutMs() {
-        return Math.max(0, parseInt(localStorage.getItem(ACCESS_LOCKOUT_KEY) || '0') - Date.now());
-    }
-
-    function updateLockoutUI() {
-        const ms = getLockoutMs();
-        if (ms > 0) {
-            lockoutEl.textContent = `Zu viele Fehlversuche – bitte ${Math.ceil(ms / 1000)} s warten.`;
-            lockoutEl.classList.remove('hidden');
-            submitBtn.disabled = true;
-            input.disabled = true;
-            return true;
+        function getLockoutMs() {
+            return Math.max(0, parseInt(localStorage.getItem(LOCKOUT_KEY) || '0') - Date.now());
         }
-        lockoutEl.classList.add('hidden');
-        submitBtn.disabled = false;
-        input.disabled = false;
-        return false;
-    }
 
-    if (updateLockoutUI()) {
-        lockoutTimer = setInterval(() => { if (!updateLockoutUI()) { clearInterval(lockoutTimer); lockoutTimer = null; } }, 1000);
-    }
-
-    async function handleSubmit() {
-        if (getLockoutMs() > 0) return;
-        const value = input.value.trim();
-        if (!value) return;
-
-        const hash = await sha256(value);
-
-        if (hash === storedHash) {
-            localStorage.removeItem(ACCESS_FAILS_KEY);
-            localStorage.removeItem(ACCESS_LOCKOUT_KEY);
-            localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
-            if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
-            gate.classList.add('hidden');
-            authScreen.classList.remove('hidden');
-            setTimeout(() => input.focus && input.blur(), 0);
-        } else {
-            const fails = (parseInt(localStorage.getItem(ACCESS_FAILS_KEY) || '0')) + 1;
-            localStorage.setItem(ACCESS_FAILS_KEY, String(fails));
-
-            if (fails >= 5) {
-                const idx = Math.min(fails - 5, BACKOFF_DELAYS.length - 1);
-                localStorage.setItem(ACCESS_LOCKOUT_KEY, String(Date.now() + BACKOFF_DELAYS[idx] * 1000));
-                updateLockoutUI();
-                lockoutTimer = setInterval(() => { if (!updateLockoutUI()) { clearInterval(lockoutTimer); lockoutTimer = null; } }, 1000);
+        function updateLockoutUI() {
+            const ms = getLockoutMs();
+            if (ms > 0) {
+                lockoutEl.textContent = `Zu viele Fehlversuche – bitte ${Math.ceil(ms / 1000)} s warten.`;
+                lockoutEl.classList.remove('hidden');
+                submitBtn.disabled = true;
+                input.disabled = true;
+                return true;
             }
-
-            const left = Math.max(0, 5 - fails);
-            errorEl.textContent = left > 0
-                ? `Falscher Zugangscode (${left} Versuche bis zur Sperre)`
-                : 'Falscher Zugangscode';
-            errorEl.classList.remove('hidden');
-            input.value = '';
-            input.focus();
+            lockoutEl.classList.add('hidden');
+            submitBtn.disabled = false;
+            input.disabled = false;
+            return false;
         }
-    }
 
-    submitBtn.addEventListener('click', handleSubmit);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+        if (updateLockoutUI()) {
+            lockoutTimer = setInterval(() => { if (!updateLockoutUI()) { clearInterval(lockoutTimer); lockoutTimer = null; } }, 1000);
+        }
+
+        async function handleSubmit() {
+            if (getLockoutMs() > 0) return;
+            const value = input.value.trim();
+            const hash = await sha256(value);
+
+            try {
+                const { grantAccess } = await import('./db.js');
+                await grantAccess(user.uid, hash);
+                // Success — Firestore accepted the hash
+                if (lockoutTimer) { clearInterval(lockoutTimer); lockoutTimer = null; }
+                localStorage.removeItem(FAILS_KEY);
+                localStorage.removeItem(LOCKOUT_KEY);
+                gate.classList.add('hidden');
+                resolve();
+            } catch (_err) {
+                // Firestore rejected → wrong code
+                const fails = parseInt(localStorage.getItem(FAILS_KEY) || '0') + 1;
+                localStorage.setItem(FAILS_KEY, String(fails));
+
+                if (fails >= 5) {
+                    const idx = Math.min(fails - 5, BACKOFF_DELAYS.length - 1);
+                    localStorage.setItem(LOCKOUT_KEY, String(Date.now() + BACKOFF_DELAYS[idx] * 1000));
+                    updateLockoutUI();
+                    lockoutTimer = setInterval(() => { if (!updateLockoutUI()) { clearInterval(lockoutTimer); lockoutTimer = null; } }, 1000);
+                }
+
+                const left = Math.max(0, 5 - fails);
+                errorEl.textContent = left > 0
+                    ? `Falscher Zugangscode (${left} Versuche bis zur Sperre)`
+                    : 'Falscher Zugangscode';
+                errorEl.classList.remove('hidden');
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        submitBtn.addEventListener('click', handleSubmit, { once: true });
+        input.addEventListener('keydown', function onKey(e) {
+            if (e.key === 'Enter') { input.removeEventListener('keydown', onKey); handleSubmit(); }
+        });
+    });
 }
 
 // ===== Auth UI =====
@@ -229,11 +225,6 @@ googleSignInBtn.addEventListener('click', async () => {
     googleSignInBtn.disabled = true;
     googleSignInBtn.textContent = 'Anmeldung\u2026';
     try {
-        // Unlock-Key jetzt setzen: Der User hat die Access Gate bereits passiert
-        // und klickt bewusst auf "Mit Google anmelden". Nach dem Redirect muss
-        // onAuthStateChanged den User durchlassen, auch wenn getRedirectResult
-        // aus irgendeinem Grund null zurückgibt.
-        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
         await signInWithGoogle(auth);
     } catch (err) {
         console.error('Sign-in error:', err);
@@ -264,11 +255,9 @@ emailSignInBtn.addEventListener('click', async () => {
     emailSignInBtn.textContent = 'Anmeldung\u2026';
 
     try {
-        localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
         await signInWithEmail(auth, email, password);
     } catch (err) {
         console.error('Email sign-in error:', err);
-        localStorage.removeItem(ACCESS_UNLOCKED_KEY);
         authEmailError.textContent = getAuthErrorMessage(err.code);
         authEmailError.classList.remove('hidden');
         emailSignInBtn.disabled = false;
@@ -654,41 +643,49 @@ async function initPages() {
 let appInitialized = false;
 
 async function boot() {
-    console.log("BOOT: start");
-
     // getRedirectResult MUSS als allererstes aufgerufen werden, bevor andere
     // async-Operationen (z.B. Firestore-Fetches) die interne Firebase-Verarbeitung
     // stören können.
     try {
-        const result = await getRedirectResult(auth);
-        console.log("BOOT: redirectResult =", result);
-        if (result) {
-            localStorage.setItem(ACCESS_UNLOCKED_KEY, 'true');
-        }
+        await getRedirectResult(auth);
     } catch (err) {
         console.error("Auth redirect error:", err);
     }
 
-    await initAccessGate();
-    console.log("BOOT: gate done, unlocked =", localStorage.getItem(ACCESS_UNLOCKED_KEY));
-
     onAuthStateChanged(auth, async (user) => {
         if (user) {
-            const isUnlocked = localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true';
-            
-            if (!isUnlocked) {
-                console.warn("Zugang nicht entsperrt – Abmeldung.");
-                await signOutUser(auth);
-                return;
-            }
-
             appState.user = user;
             authScreen.classList.add('hidden');
-            appShell.classList.remove('hidden');
 
             try {
-                const { initUser } = await import('./db.js');
+                const { initUser, checkAllowedAccess, grantAccess, createDefaultData } = await import('./db.js');
                 const { isNewUser } = await initUser(user);
+
+                // Check if this user already has access granted in Firestore
+                let hasAccess = await checkAllowedAccess(user.uid);
+
+                if (!hasAccess) {
+                    // Try a silent grant (succeeds when no config/appAccess doc is set)
+                    try {
+                        await grantAccess(user.uid, '');
+                        hasAccess = true;
+                    } catch {
+                        // config/appAccess exists → show the gate, wait for user
+                        await showAccessGate(user);
+                        hasAccess = true; // gate resolves only on success
+                    }
+                }
+
+                appShell.classList.remove('hidden');
+
+                // Create inbox list for new users (deferred until after access granted)
+                if (isNewUser) {
+                    await createDefaultData(user.uid);
+                }
+
+                // Preload GCal token from Firestore (fire-and-forget, no callback)
+                import('./gcal.js').then(({ initGcal }) => initGcal(user.uid)).catch(() => {});
+
                 await subscribeToData();
 
                 if (!appInitialized) {
@@ -717,10 +714,8 @@ async function boot() {
             appState.user = null;
             unsubscribeData();
             appShell.classList.add('hidden');
-
-            if (localStorage.getItem(ACCESS_UNLOCKED_KEY) === 'true') {
-                authScreen.classList.remove('hidden');
-            }
+            document.getElementById('access-gate')?.classList.add('hidden');
+            authScreen.classList.remove('hidden');
         }
     });
 }

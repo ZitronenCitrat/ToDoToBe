@@ -144,13 +144,17 @@ function renderEventCard(ev, isPast = false) {
     };
     const color = categoryColors[ev.category] || '#22c55e';
 
+    const timeStr = ev.time
+        ? (ev.endTime ? `${ev.time} – ${ev.endTime}` : ev.time)
+        : '';
+
     return `<div class="glass-sm p-4 mb-2 flex items-start gap-3${isPast ? ' opacity-60' : ''}" style="border-left:3px solid ${color}">
         <span class="material-symbols-outlined" style="font-size:20px;color:${color};flex-shrink:0;margin-top:2px">event</span>
         <div class="flex-1 min-w-0">
             <div style="font-size:15px;font-weight:500">${escapeHtml(ev.title)}</div>
             <div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">
                 ${dateStr ? escapeHtml(dateStr) : ''}
-                ${ev.time ? ' · ' + escapeHtml(ev.time) : ''}
+                ${timeStr ? ' · ' + escapeHtml(timeStr) : ''}
                 ${ev.category ? ' · ' + escapeHtml(ev.category) : ''}
                 ${recurrenceIcon ? ` · <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">${recurrenceIcon}</span>` : ''}
             </div>
@@ -192,13 +196,17 @@ function openEventModal(existing = null) {
                 placeholder="Titel" value="${existing ? escapeAttr(existing.title || '') : ''}">
 
             <div class="flex gap-2 mb-3">
-                <div class="flex-1">
+                <div style="flex:1.3">
                     <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
                     <input type="date" id="evd-date" class="glass-input w-full" value="${dateStr}">
                 </div>
                 <div class="flex-1">
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Uhrzeit</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Von</div>
                     <input type="time" id="evd-time" class="glass-input w-full" value="${existing?.time || ''}">
+                </div>
+                <div class="flex-1">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Bis</div>
+                    <input type="time" id="evd-end-time" class="glass-input w-full" value="${existing?.endTime || ''}">
                 </div>
             </div>
 
@@ -234,6 +242,7 @@ function openEventModal(existing = null) {
             title,
             date: modal.querySelector('#evd-date').value || null,
             time: modal.querySelector('#evd-time').value || null,
+            endTime: modal.querySelector('#evd-end-time').value || null,
             category: modal.querySelector('#evd-category').value || null,
             recurrence: modal.querySelector('#evd-recurrence').value || null,
         };
