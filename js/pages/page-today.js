@@ -1,7 +1,7 @@
 import { appState, onStateChange } from '../app.js';
 import { createTodoElement } from '../todo-item.js';
 import { onRouteChange, navigate } from '../router.js';
-import { isToday, isOverdue, formatTodayHeader, todayDateStr } from '../utils.js';
+import { isToday, isOverdue, formatTodayHeader, todayDateStr, isTodoActiveOnDate } from '../utils.js';
 import { updateTodo } from '../db.js';
 
 let stateUnsub = null;
@@ -67,17 +67,7 @@ export function initPageToday() {
 }
 
 function isRecurringToday(todo) {
-    if (!todo.recurrence) return false;
-    const today = new Date();
-    // 0=Mon, 1=Tue, ..., 6=Sun
-    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
-
-    if (todo.recurrence === 'daily') return true;
-    if (todo.recurrence === 'weekly') {
-        const weekdays = todo.recurrenceWeekdays || [];
-        return weekdays.includes(dayOfWeek);
-    }
-    return false;
+    return isTodoActiveOnDate(todo, new Date());
 }
 
 function needsReset(todo) {

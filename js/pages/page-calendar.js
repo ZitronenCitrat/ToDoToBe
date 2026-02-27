@@ -4,7 +4,7 @@ import { createTodoElement } from '../todo-item.js';
 import {
     getWeekdayShort, formatMonthYear, getDaysInMonth,
     getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
-    getActiveSemester, isTodayLectureDay, toInputDate
+    getActiveSemester, isTodayLectureDay, toInputDate, isTodoActiveOnDate
 } from '../utils.js';
 import { addEvent, updateEvent, deleteEvent } from '../db.js';
 
@@ -159,6 +159,16 @@ function buildItemsByDay() {
         if (!d) return;
         const key = startOfDay(d).toISOString();
         (todosByDay[key] = todosByDay[key] || []).push(t);
+    });
+
+    // Recurring todos with showInCalendar: inject into TODAY's bucket only (never future/past)
+    const todayKey = startOfDay(new Date()).toISOString();
+    appState.allTodos.forEach(t => {
+        if (!t.recurrence || !t.showInCalendar) return;
+        if (!isTodoActiveOnDate(t, new Date())) return;
+        // Avoid duplicate if dueDate already placed it on today
+        const bucket = todosByDay[todayKey] = todosByDay[todayKey] || [];
+        if (!bucket.find(x => x.id === t.id)) bucket.push(t);
     });
 
     appState.allExams.forEach(e => {

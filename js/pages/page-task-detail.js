@@ -1,6 +1,6 @@
 import { appState, onStateChange } from '../app.js';
 import { onRouteChange, getCurrentRoute, back, navigate } from '../router.js';
-import { toInputDate } from '../utils.js';
+import { toInputDate, isTodoActiveOnDate } from '../utils.js';
 import {
     updateTodo, deleteTodo, addSubtask, toggleSubtask,
     updateSubtaskTitle, removeSubtask
@@ -33,7 +33,7 @@ export function initPageTaskDetail() {
                 style="font-size:20px;font-weight:600;padding:16px">
 
             <div class="glass-sm p-4 mb-4">
-                <div class="flex items-center gap-3 mb-4">
+                <div class="flex items-center gap-3 mb-4" id="task-due-date-row">
                     <span class="material-symbols-outlined" style="color:var(--text-tertiary)">event</span>
                     <div class="flex-1">
                         <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Fälligkeitsdatum</div>
@@ -60,13 +60,29 @@ export function initPageTaskDetail() {
                         <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Wiederholung</div>
                         <select id="task-recurrence" class="glass-select w-full">
                             <option value="">Keine</option>
-                            <option value="daily">Täglich</option>
                             <option value="weekly">Wöchentlich</option>
+                            <option value="monthly">Monatlich</option>
                         </select>
-                        <div id="task-weekday-picker" class="flex gap-1 mt-2 hidden">
+                        <div id="task-weekday-picker" class="flex gap-1 mt-2 hidden" style="flex-wrap:wrap">
                             ${WEEKDAY_LABELS.map((d, i) => `<button class="weekday-btn" data-day="${i}">${d}</button>`).join('')}
                         </div>
+                        <div id="task-monthday-picker" class="mt-2 hidden">
+                            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">Tag des Monats</div>
+                            <input type="number" id="task-month-day" class="glass-input" min="1" max="31" placeholder="1–31" style="width:100px">
+                        </div>
                     </div>
+                </div>
+
+                <div class="flex items-center gap-3 mb-4 hidden" id="task-calendar-row">
+                    <span class="material-symbols-outlined" style="color:var(--text-tertiary)">calendar_month</span>
+                    <div class="flex-1">
+                        <div style="font-size:13px;color:var(--text-tertiary)">Im Kalender anzeigen</div>
+                        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Erscheint heute im Kalender, wenn aktiv</div>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="task-show-in-calendar">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -126,13 +142,22 @@ export function initPageTaskDetail() {
         });
     });
 
-    // Recurrence select
+    // Recurrence select — show/hide pickers + due date + calendar toggle
     const recurrenceSelect = container.querySelector('#task-recurrence');
     const weekdayPicker = container.querySelector('#task-weekday-picker');
+    const monthdayPicker = container.querySelector('#task-monthday-picker');
+    const dueDateRow = container.querySelector('#task-due-date-row');
+    const calendarRow = container.querySelector('#task-calendar-row');
 
-    recurrenceSelect.addEventListener('change', () => {
-        weekdayPicker.classList.toggle('hidden', recurrenceSelect.value !== 'weekly');
-    });
+    function syncRecurrenceUI() {
+        const val = recurrenceSelect.value;
+        weekdayPicker.classList.toggle('hidden', val !== 'weekly');
+        monthdayPicker.classList.toggle('hidden', val !== 'monthly');
+        dueDateRow.classList.toggle('hidden', !!val);
+        calendarRow.classList.toggle('hidden', !val);
+    }
+
+    recurrenceSelect.addEventListener('change', syncRecurrenceUI);
 
     // Weekday toggle buttons
     container.querySelectorAll('.weekday-btn').forEach(btn => {
@@ -186,19 +211,37 @@ function loadTodo() {
     const activeP = container.querySelector(`#task-priority [data-priority="${todo.priority || 4}"]`);
     if (activeP) activeP.classList.add('active');
 
-    // Recurrence
+    // Recurrence — migrate legacy 'daily' → 'weekly' with all days
     const recurrenceSelect = container.querySelector('#task-recurrence');
-    recurrenceSelect.value = todo.recurrence || '';
-
-    const weekdayPicker = container.querySelector('#task-weekday-picker');
-    weekdayPicker.classList.toggle('hidden', recurrenceSelect.value !== 'weekly');
+    let loadedRecurrence = todo.recurrence || '';
+    let loadedWeekdays = todo.recurrenceWeekdays || [];
+    if (loadedRecurrence === 'daily') {
+        loadedRecurrence = 'weekly';
+        loadedWeekdays = [0, 1, 2, 3, 4, 5, 6];
+    }
+    recurrenceSelect.value = loadedRecurrence;
 
     // Weekday buttons
     container.querySelectorAll('.weekday-btn').forEach(btn => {
         const day = parseInt(btn.dataset.day);
-        const weekdays = todo.recurrenceWeekdays || [];
-        btn.classList.toggle('active', weekdays.includes(day));
+        btn.classList.toggle('active', loadedWeekdays.includes(day));
     });
+
+    // Month-day input
+    container.querySelector('#task-month-day').value = todo.recurrenceMonthDay || '';
+
+    // Calendar toggle
+    container.querySelector('#task-show-in-calendar').checked = !!todo.showInCalendar;
+
+    // Sync UI visibility
+    const weekdayPicker = container.querySelector('#task-weekday-picker');
+    const monthdayPicker = container.querySelector('#task-monthday-picker');
+    const dueDateRow = container.querySelector('#task-due-date-row');
+    const calendarRow = container.querySelector('#task-calendar-row');
+    weekdayPicker.classList.toggle('hidden', loadedRecurrence !== 'weekly');
+    monthdayPicker.classList.toggle('hidden', loadedRecurrence !== 'monthly');
+    dueDateRow.classList.toggle('hidden', !!loadedRecurrence);
+    calendarRow.classList.toggle('hidden', !loadedRecurrence);
 
     // List select
     const listSelect = container.querySelector('#task-list-select');
@@ -294,8 +337,20 @@ async function saveTask() {
             recurrenceWeekdays.push(parseInt(btn.dataset.day));
         });
     }
+    const recurrenceMonthDay = recurrence === 'monthly'
+        ? (parseInt(container.querySelector('#task-month-day').value) || null)
+        : null;
+    const showInCalendar = recurrence
+        ? container.querySelector('#task-show-in-calendar').checked
+        : false;
 
-    await updateTodo(currentTodoId, { title, priority, dueDate, notes, listId, recurrence, recurrenceWeekdays });
+    // When recurrence is active, clear dueDate (the two concepts are mutually exclusive)
+    const effectiveDueDate = recurrence ? null : dueDate;
+
+    await updateTodo(currentTodoId, {
+        title, priority, dueDate: effectiveDueDate, notes, listId,
+        recurrence, recurrenceWeekdays, recurrenceMonthDay, showInCalendar
+    });
     back();
 }
 

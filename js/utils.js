@@ -211,6 +211,34 @@ export function todayDateStr() {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+/**
+ * Returns true if a recurring todo is active on the given date.
+ * Handles recurrence types: 'weekly' (uses recurrenceWeekdays[]),
+ * 'monthly' (uses recurrenceMonthDay, month-end clamped), 'daily' (backward compat).
+ * App weekday convention: 0=Mon … 6=Sun (matches weekday-picker data-day values).
+ */
+export function isTodoActiveOnDate(todo, date) {
+    if (!todo.recurrence) return false;
+    const d = date instanceof Date ? date : new Date(date);
+
+    // App convention: 0=Mon...6=Sun; JS getDay(): 0=Sun...6=Sat
+    const appDayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1;
+
+    if (todo.recurrence === 'daily') return true; // backward compat
+    if (todo.recurrence === 'weekly') {
+        const weekdays = todo.recurrenceWeekdays || [];
+        return weekdays.includes(appDayOfWeek);
+    }
+    if (todo.recurrence === 'monthly') {
+        const target = todo.recurrenceMonthDay;
+        if (!target) return false;
+        // Clamp to last day of month (e.g. day 31 in a 30-day month → day 30)
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        return d.getDate() === Math.min(target, lastDay);
+    }
+    return false;
+}
+
 export function calculateCourseAverage(exams, assignments) {
     const graded = [
         ...exams.filter(e => e.grade != null).map(e => ({ grade: e.grade, weight: e.weight || 1 })),

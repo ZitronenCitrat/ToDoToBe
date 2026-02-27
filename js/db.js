@@ -144,7 +144,8 @@ export async function createTodo(title, listId, { priority = 4, dueDate = null, 
         title, notes, completed: false, completedAt: null,
         priority, dueDate: dueDateTs,
         listId, subtasks: [], sortOrder: maxOrder + 1,
-        recurrence: null, recurrenceWeekdays: [], lastResetDate: null,
+        recurrence: null, recurrenceWeekdays: [], recurrenceMonthDay: null,
+        showInCalendar: false, lastResetDate: null,
         createdAt: Timestamp.now(), updatedAt: Timestamp.now()
     });
     gcalSync('todo', ref.id, { title, notes, dueDate: dueDateTs });
