@@ -1,4 +1,4 @@
-import { appState, onStateChange, registerFabAction, openQuickAdd } from '../app.js';
+import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
 import { createTodoElement } from '../todo-item.js';
 import {
@@ -6,11 +6,12 @@ import {
     getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
     getActiveSemester, isTodayLectureDay, toInputDate
 } from '../utils.js';
+import { addEvent, updateEvent, deleteEvent } from '../db.js';
 
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
 let selectedDate = startOfDay(new Date());
-let calFilter = 'all'; // 'all' | 'todos' | 'uni' | 'wishes'
+let calFilter = 'all'; // 'all' | 'todos' | 'uni' | 'wishes' | 'personal'
 let initialized = false;
 
 export function initPageCalendar() {
@@ -23,9 +24,6 @@ export function initPageCalendar() {
         <div class="page-header">
             <h1 class="page-header-title">Kalender</h1>
             <div class="page-header-actions">
-                <button class="icon-btn" id="cal-add-event-btn" title="Termin hinzufügen">
-                    <span class="material-symbols-outlined">event</span>
-                </button>
                 <button class="icon-btn" id="cal-today-btn" title="Heute">
                     <span class="material-symbols-outlined">today</span>
                 </button>
@@ -51,6 +49,7 @@ export function initPageCalendar() {
                     <button class="tab-btn" data-filter="todos">Todos</button>
                     <button class="tab-btn" data-filter="uni">Uni</button>
                     <button class="tab-btn" data-filter="wishes">Wünsche</button>
+                    <button class="tab-btn" data-filter="personal">Persönlich</button>
                 </div>
                 <h2 id="cal-day-label" style="font-size:16px;font-weight:600;margin-bottom:12px"></h2>
                 <div id="cal-day-items"></div>
@@ -84,10 +83,6 @@ export function initPageCalendar() {
         selectedDate = startOfDay(new Date());
         renderCalendar();
     });
-    container.querySelector('#cal-add-event-btn').addEventListener('click', () => {
-        openAddEventModal(selectedDate);
-    });
-
     // Filter tabs
     container.querySelector('#cal-filter-tabs').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-filter]');
@@ -111,9 +106,10 @@ export function initPageCalendar() {
         }
     });
 
-    // Register FAB: add todo for the selected date
+    // Register FAB: add event for the selected date (pre-fills "Persönlich" when that filter is active)
     registerFabAction('calendar', () => {
-        openQuickAdd(selectedDate);
+        const defaultCategory = calFilter === 'personal' ? 'Persönlich' : null;
+        openAddEventModal(selectedDate, null, defaultCategory);
     });
 
     renderCalendar();
@@ -413,10 +409,13 @@ function renderDayItems() {
     }
 
     // --- Termine / Events ---
-    if ((calFilter === 'all') && events.length > 0) {
+    const visibleEvents = calFilter === 'personal'
+        ? events.filter(ev => ev.category === 'Persönlich')
+        : events;
+    if ((calFilter === 'all' || calFilter === 'personal') && visibleEvents.length > 0) {
         hasContent = true;
-        sectionLabel('Termine', '#22c55e');
-        events.forEach(ev => {
+        if (calFilter === 'all') sectionLabel('Termine', '#22c55e');
+        visibleEvents.forEach(ev => {
             const timeRange = ev.time
                 ? (ev.endTime ? `${ev.time}–${ev.endTime}` : ev.time)
                 : '';
@@ -480,7 +479,7 @@ function renderDayItems() {
 
 const EVENT_CATEGORIES = ['Uni', 'Wünsche', 'Todos', 'Persönlich', 'Arbeit', 'Sonstiges'];
 
-function openAddEventModal(defaultDate, existing = null) {
+function openAddEventModal(defaultDate, existing = null, defaultCategory = null) {
     const old = document.getElementById('event-modal');
     if (old) old.remove();
 
@@ -491,6 +490,9 @@ function openAddEventModal(defaultDate, existing = null) {
     const dateStr = existing
         ? (typeof existing.date === 'string' ? existing.date : toInputDate(toDate(existing.date)) || '')
         : toInputDate(defaultDate);
+
+    // Determine which category option should be pre-selected
+    const selectedCat = existing?.category ?? defaultCategory ?? '';
 
     modal.innerHTML = `
         <div class="modal-backdrop"></div>
@@ -515,8 +517,8 @@ function openAddEventModal(defaultDate, existing = null) {
             </div>
             <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Kategorie</div>
             <select id="event-category" class="glass-select w-full mb-3">
-                <option value="">Keine Kategorie</option>
-                ${EVENT_CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${existing?.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+                <option value="" ${selectedCat === '' ? 'selected' : ''}>Keine Kategorie</option>
+                ${EVENT_CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${selectedCat === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
             </select>
             <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Wiederholung</div>
             <select id="event-recurrence" class="glass-select w-full mb-4">
@@ -545,21 +547,23 @@ function openAddEventModal(defaultDate, existing = null) {
             category: modal.querySelector('#event-category').value || null,
             recurrence: modal.querySelector('#event-recurrence').value || null,
         };
-        const { addEvent, updateEvent } = await import('../db.js');
+        // Close immediately for instant feedback
+        modal.remove();
         if (existing) {
             await updateEvent(existing.id, data);
         } else {
             await addEvent(data);
         }
-        modal.remove();
+        // Force re-render to reflect changes (Firestore onSnapshot may not have fired yet)
+        renderCalendar();
     });
 
     if (existing) {
         modal.querySelector('#event-delete')?.addEventListener('click', async () => {
             if (!confirm('Termin löschen?')) return;
-            const { deleteEvent } = await import('../db.js');
-            await deleteEvent(existing.id);
             modal.remove();
+            await deleteEvent(existing.id);
+            renderCalendar();
         });
     }
 

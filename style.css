@@ -907,6 +907,47 @@ input, textarea, select {
     border-color: var(--accent) !important;
 }
 
+/* ===== Mobile Compact (phones ≤767px) ===== */
+@media (max-width: 767px) {
+    :root {
+        --nav-height: 54px;
+    }
+
+    .nav-tab {
+        padding: 5px 12px;
+    }
+
+    .nav-tab .material-symbols-outlined {
+        font-size: 22px;
+    }
+}
+
+/* ===== Mode Tabs: icon-only on narrow screens (≤480px) ===== */
+@media (max-width: 480px) {
+    .mode-tabs-bar {
+        gap: 2px;
+        padding: 6px 8px;
+        padding-top: calc(6px + var(--safe-top));
+        justify-content: space-between;
+    }
+
+    .mode-tab {
+        flex: 1;
+        justify-content: center;
+        padding: 7px 8px;
+        gap: 0;
+        min-width: 0;
+    }
+
+    .mode-tab span:not(.material-symbols-outlined) {
+        display: none;
+    }
+
+    .mode-tab .material-symbols-outlined {
+        font-size: 22px;
+    }
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
     .modal-sheet {

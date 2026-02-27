@@ -314,7 +314,7 @@ function openWishlistModal(existing = null) {
 
     modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.remove());
 
-    modal.querySelector('#wish-save').addEventListener('click', async () => {
+    modal.querySelector('#wish-save').addEventListener('click', () => {
         const title = modal.querySelector('#wish-title').value.trim();
         if (!title) return;
         const priceVal = modal.querySelector('#wish-price').value;
@@ -330,12 +330,16 @@ function openWishlistModal(existing = null) {
             url: modal.querySelector('#wish-url').value.trim()
         };
 
-        if (existing) {
-            await updateWishlistItem(existing.id, data);
-        } else {
-            await addWishlistItem(data);
-        }
+        // Close modal immediately for instant feedback, then sync to DB in background.
         modal.remove();
+
+        if (existing) {
+            updateWishlistItem(existing.id, data);
+        } else {
+            // Compute sortOrder from in-memory state to avoid a Firestore getDocs round-trip.
+            const maxOrder = appState.allWishlistItems.reduce((m, i) => Math.max(m, i.sortOrder || 0), 0);
+            addWishlistItem({ ...data, sortOrder: maxOrder });
+        }
     });
 
     setTimeout(() => modal.querySelector('#wish-title').focus(), 100);

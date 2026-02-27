@@ -55,7 +55,6 @@ function render() {
     Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, catItems]) => {
         const icon = CATEGORY_ICONS[cat] || 'category';
         const unpurchased = catItems.filter(i => !i.purchased);
-        const totalPrice = catItems.filter(i => i.price != null).reduce((s, i) => s + i.price, 0);
         const purchasedCount = catItems.filter(i => i.purchased).length;
 
         html += `<div class="glass-sm mb-3">
@@ -70,7 +69,6 @@ function render() {
                 <div class="flex items-center gap-4" style="font-size:13px;color:var(--text-secondary)">
                     <span>${unpurchased.length} offen</span>
                     <span>${purchasedCount} gekauft</span>
-                    ${totalPrice > 0 ? `<span style="color:var(--accent)">${formatPrice(totalPrice)}</span>` : ''}
                 </div>
             </div>
             <div style="border-top:1px solid var(--surface-border)">`;

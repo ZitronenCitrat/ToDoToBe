@@ -402,18 +402,18 @@ export function subscribeWishlistItems(callback) {
 }
 
 export async function addWishlistItem(data) {
-    const snapshot = await getDocs(userCol('wishlistItems'));
-    let maxOrder = 0;
-    snapshot.forEach((d) => { if (d.data().sortOrder > maxOrder) maxOrder = d.data().sortOrder; });
+    // sortOrder is pre-computed by the caller from in-memory appState (avoids a getDocs round-trip).
+    // Fallback to Date.now() so this function remains safe to call without a pre-computed order.
+    const sortOrder = (data.sortOrder != null) ? data.sortOrder : Date.now();
     const dateTs = data.date ? Timestamp.fromDate(new Date(data.date)) : null;
     const ref = await addDoc(userCol('wishlistItems'), {
         title: data.title || '', category: data.category || 'Sonstiges',
         price: data.price ?? null,
-        nutzen: data.nutzen ?? 3,              // 1–5 star rating (was binary, now numeric scale)
-        date: dateTs,                          // release/purchase date
+        nutzen: data.nutzen ?? 3,
+        date: dateTs,
         purchased: false, purchasedAt: null,
-        priority: data.priority || 4, notes: data.notes || '',
-        url: data.url || '', sortOrder: maxOrder + 1, createdAt: Timestamp.now()
+        priority: 4, notes: data.notes || '',
+        url: data.url || '', sortOrder, createdAt: Timestamp.now()
     });
     gcalSync('wish', ref.id, { title: data.title, date: dateTs, category: data.category, price: data.price });
     return ref;

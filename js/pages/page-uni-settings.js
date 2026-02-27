@@ -15,7 +15,7 @@ export function initPageUniSettings() {
             <button class="icon-btn" id="uni-settings-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 class="page-header-title" style="flex:1;margin-left:8px">Uni-Einstellungen</h1>
+            <h1 class="page-header-title" style="flex:1;margin-left:8px">Semester</h1>
         </div>
         <div class="px-5 flex-1">
             <div style="font-size:13px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">Semester</div>

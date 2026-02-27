@@ -21,8 +21,9 @@ export function initPageUni() {
 
     container.innerHTML = `
         <div class="page-header">
-            <button class="icon-btn" id="uni-settings-btn">
-                <span class="material-symbols-outlined">settings</span>
+            <button class="icon-btn" id="uni-settings-btn" style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:600;color:var(--text-secondary)">
+                <span class="material-symbols-outlined" style="font-size:18px">edit_calendar</span>
+                <span>Semester</span>
             </button>
             <div class="page-header-actions">
                 <button class="avatar-btn" id="uni-avatar-btn">

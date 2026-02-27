@@ -26,7 +26,7 @@ const NAV_CONFIGS = {
         { route: 'wishlist',             icon: 'shopping_cart', label: 'Liste'      },
         { spacer: true },
         { route: 'wishlist-categories',  icon: 'category',      label: 'Kategorien' },
-        { route: 'wishlist-matrix',      icon: 'grid_view',     label: 'Matrix'     },
+        { route: 'wishlist-matrix',      icon: 'bar_chart',     label: 'Übersicht'  },
     ],
 };
 
