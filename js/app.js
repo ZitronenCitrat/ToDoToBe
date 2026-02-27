@@ -47,7 +47,7 @@ export const appState = {
     allFlashcards: [],
     allSemesters: [],
     allEvents: [],             // calendar Termine
-    settings: { theme: 'dark', notifications: false }
+    settings: { theme: 'light', notifications: false }
 };
 
 const stateListeners = new Set();

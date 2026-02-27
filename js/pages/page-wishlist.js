@@ -31,12 +31,26 @@ export function initPageWishlist() {
                 </button>
             </div>
         </div>
+        <div class="page-context-btns">
+            <button class="context-btn" id="wishlist-categories-btn">
+                <span class="material-symbols-outlined">category</span>Kategorien
+            </button>
+            <button class="context-btn" id="wishlist-overview-btn">
+                <span class="material-symbols-outlined">bar_chart</span>Übersicht
+            </button>
+        </div>
         <div class="px-5 mb-3 flex gap-2 flex-wrap" id="wishlist-filters"></div>
         <div class="px-5 flex-1" id="wishlist-content"></div>
     `;
 
     container.querySelector('#wishlist-add-btn').addEventListener('click', () => openWishlistModal());
     container.querySelector('#wishlist-sort-btn').addEventListener('click', cycleSort);
+    container.querySelector('#wishlist-categories-btn').addEventListener('click', () => {
+        import('../router.js').then(({ navigate }) => navigate('wishlist-categories'));
+    });
+    container.querySelector('#wishlist-overview-btn').addEventListener('click', () => {
+        import('../router.js').then(({ navigate }) => navigate('wishlist-matrix'));
+    });
     registerFabAction('wishlist', () => openWishlistModal());
 
     onStateChange(() => { if (isActive()) render(); });

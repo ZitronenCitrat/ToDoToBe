@@ -28,9 +28,20 @@ export function initPageToday() {
                 </button>
             </div>
         </div>
-        <div class="px-5 pb-3">
+        <div class="px-5 pb-1">
             <h1 class="text-2xl font-bold">Heute</h1>
             <p class="text-sm mt-1" style="color:var(--text-tertiary)" id="today-date-label"></p>
+        </div>
+        <div class="page-context-btns">
+            <button class="context-btn" id="today-projects-btn">
+                <span class="material-symbols-outlined">folder_open</span>Projekte
+            </button>
+            <button class="context-btn" id="today-stats-btn">
+                <span class="material-symbols-outlined">bar_chart</span>Statistik
+            </button>
+            <button class="context-btn" id="today-habits-btn">
+                <span class="material-symbols-outlined">repeat_on</span>Gewohnheiten
+            </button>
         </div>
         <div class="px-5 mb-4" id="today-goal-card"></div>
         <div class="px-5" id="today-routine-section"></div>
@@ -50,6 +61,9 @@ export function initPageToday() {
     container.querySelector('#today-settings-btn').addEventListener('click', () => navigate('settings'));
     container.querySelector('#today-review-btn').addEventListener('click', () => navigate('weekly-review'));
     container.querySelector('#today-avatar-btn').addEventListener('click', () => navigate('settings'));
+    container.querySelector('#today-projects-btn').addEventListener('click', () => navigate('projects'));
+    container.querySelector('#today-stats-btn').addEventListener('click', () => navigate('stats'));
+    container.querySelector('#today-habits-btn').addEventListener('click', () => navigate('habits'));
 
     container.querySelector('#today-toggle-completed').addEventListener('click', () => {
         const list = container.querySelector('#today-completed-list');

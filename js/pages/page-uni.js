@@ -31,15 +31,33 @@ export function initPageUni() {
                 </button>
             </div>
         </div>
-        <div class="px-5 pb-3">
+        <div class="px-5 pb-1">
             <h1 class="text-2xl font-bold">Uni-Planer</h1>
             <p class="text-sm mt-1" style="color:var(--text-tertiary)" id="uni-semester-label"></p>
+        </div>
+        <div class="page-context-btns">
+            <button class="context-btn" id="uni-timetable-btn">
+                <span class="material-symbols-outlined">schedule</span>Stundenplan
+            </button>
+            <button class="context-btn" id="uni-assignments-btn">
+                <span class="material-symbols-outlined">assignment</span>Aufgaben
+            </button>
+            <button class="context-btn" id="uni-grades-btn">
+                <span class="material-symbols-outlined">grade</span>Noten
+            </button>
+            <button class="context-btn" id="uni-flashcards-btn">
+                <span class="material-symbols-outlined">style</span>Karten
+            </button>
         </div>
         <div class="px-5 flex-1 overflow-y-auto" id="uni-content"></div>
     `;
 
     container.querySelector('#uni-settings-btn').addEventListener('click', () => navigate('uni-settings'));
     container.querySelector('#uni-avatar-btn').addEventListener('click', () => navigate('uni-settings'));
+    container.querySelector('#uni-timetable-btn').addEventListener('click', () => navigate('timetable'));
+    container.querySelector('#uni-assignments-btn').addEventListener('click', () => navigate('assignments'));
+    container.querySelector('#uni-grades-btn').addEventListener('click', () => navigate('grades'));
+    container.querySelector('#uni-flashcards-btn').addEventListener('click', () => navigate('flashcards'));
 
     onStateChange(() => { if (isActive()) render(); });
     onRouteChange((route) => { if (route === 'uni') render(); });

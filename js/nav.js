@@ -1,34 +1,16 @@
-import { navigate } from './router.js';
-import { appState, onStateChange } from './app.js';
+import { appState, onStateChange, setMode } from './app.js';
 
-const NAV_CONFIGS = {
-    home: [
-        { spacer: true },
-    ],
-    calendar: [
-        { spacer: true },
-    ],
-    todo: [
-        { route: 'today',    icon: 'today',          label: 'Heute',     badgeId: 'badge-today' },
-        { spacer: true },
-        { route: 'projects', icon: 'folder_open',     label: 'Projekte'  },
-        { route: 'stats',    icon: 'bar_chart',       label: 'Statistik' },
-    ],
-    uni: [
-        { route: 'uni',         icon: 'school',       label: 'Übersicht' },
-        { route: 'timetable',   icon: 'schedule',     label: 'Stundenplan' },
-        { spacer: true },
-        { route: 'assignments', icon: 'assignment',    label: 'Aufgaben'  },
-        { route: 'grades',      icon: 'grade',         label: 'Noten'     },
-        { route: 'flashcards',  icon: 'style',         label: 'Karten'    },
-    ],
-    wishlist: [
-        { route: 'wishlist',             icon: 'shopping_cart', label: 'Liste'      },
-        { spacer: true },
-        { route: 'wishlist-categories',  icon: 'category',      label: 'Kategorien' },
-        { route: 'wishlist-matrix',      icon: 'bar_chart',     label: 'Übersicht'  },
-    ],
-};
+/**
+ * The 5 main mode tabs shown in the floating bottom pill.
+ * Active state is driven by appState.activeMode.
+ */
+const MODE_TABS = [
+    { mode: 'home',     icon: 'home',          label: 'Home'     },
+    { mode: 'calendar', icon: 'calendar_month', label: 'Kalender' },
+    { mode: 'todo',     icon: 'checklist',      label: 'To-Do', badgeId: 'badge-today' },
+    { mode: 'uni',      icon: 'school',         label: 'Uni'      },
+    { mode: 'wishlist', icon: 'shopping_bag',   label: 'Wünsche'  },
+];
 
 let currentBadges = {};
 
@@ -39,21 +21,16 @@ export function initNav() {
 
 function renderNav() {
     const nav = document.getElementById('bottom-nav');
-    const mode = appState.activeMode || 'todo';
-    const config = NAV_CONFIGS[mode] || NAV_CONFIGS.todo;
+    if (!nav) return;
+
+    const activeMode = appState.activeMode || 'home';
 
     nav.innerHTML = '';
-    config.forEach(item => {
-        if (item.spacer) {
-            const spacer = document.createElement('div');
-            spacer.className = 'nav-tab-spacer';
-            nav.appendChild(spacer);
-            return;
-        }
 
+    MODE_TABS.forEach(item => {
         const btn = document.createElement('button');
-        btn.className = 'nav-tab';
-        btn.dataset.route = item.route;
+        btn.className = 'nav-tab' + (item.mode === activeMode ? ' active' : '');
+        btn.dataset.mode = item.mode;
 
         btn.innerHTML = `
             <span class="material-symbols-outlined">${item.icon}</span>
@@ -61,18 +38,11 @@ function renderNav() {
             ${item.badgeId ? `<span class="nav-tab-badge" id="${item.badgeId}"></span>` : ''}
         `;
 
-        btn.addEventListener('click', () => navigate(item.route));
-
-        // Check if this tab is active based on current hash
-        const currentHash = window.location.hash.slice(1).split('/')[0] || 'today';
-        if (currentHash === item.route) {
-            btn.classList.add('active');
-        }
-
+        btn.addEventListener('click', () => setMode(item.mode));
         nav.appendChild(btn);
     });
 
-    // Re-apply badges
+    // Re-apply badges after render
     if (currentBadges.today) {
         const badge = document.getElementById('badge-today');
         if (badge) badge.textContent = currentBadges.today > 0 ? currentBadges.today : '';
