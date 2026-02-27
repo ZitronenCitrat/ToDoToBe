@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-const CACHE_NAME = 'todotobe-v10';
-=======
 const CACHE_NAME = 'todotobe-v14';
->>>>>>> 4733227 (feat: Wünsche-Übersicht, Kalender-Fixes, mobile Nav, Uni-Semester-Button)
 
 const APP_SHELL = [
     './',
