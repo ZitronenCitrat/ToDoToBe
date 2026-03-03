@@ -26,7 +26,7 @@ export function initPageHome() {
             </div>
         </div>
         <div class="px-5 pb-3">
-            <h1 id="home-greeting" class="text-2xl font-bold">Guten Morgen</h1>
+            <h1 id="home-greeting" class="page-title">Guten Morgen</h1>
             <p class="text-sm mt-1" style="color:var(--text-tertiary)" id="home-date-label"></p>
         </div>
         <div class="px-5" id="home-content"></div>
@@ -109,9 +109,11 @@ function renderHome() {
         outlookToggle.addEventListener('click', () => {
             const body = content.querySelector('#home-outlook-body');
             const arrow = content.querySelector('#home-outlook-arrow');
+            const badge = content.querySelector('#home-outlook-badge');
             if (body) body.classList.toggle('hidden');
             const isOpen = body && !body.classList.contains('hidden');
             if (arrow) arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+            if (badge) badge.style.display = isOpen ? 'none' : '';
         });
     }
 
@@ -140,9 +142,19 @@ function buildGoalRingHtml() {
                 stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
         </svg>
         <div>
-            <div style="color:var(--text-tertiary);font-size:12px;font-weight:500;margin-bottom:2px">Tagesziel</div>
-            <div style="font-size:28px;font-weight:700;letter-spacing:-1px">${done}<span style="color:var(--text-tertiary);font-size:18px;font-weight:400">/${total}</span></div>
-            <div style="color:var(--text-secondary);font-size:12px">${percent}% erledigt</div>
+            <div style="color:var(--text-tertiary);font-size:12px;font-weight:500;margin-bottom:6px">Tagesziel</div>
+            <div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px">
+                <div style="display:flex;flex-direction:column;align-items:center">
+                    <span style="font-size:28px;font-weight:700;letter-spacing:-1px;line-height:1">${done}</span>
+                    <span style="color:var(--text-tertiary);font-size:11px;margin-top:3px">erledigt</span>
+                </div>
+                <span style="color:var(--text-tertiary);font-size:20px;font-weight:300;line-height:1;padding-top:2px">/</span>
+                <div style="display:flex;flex-direction:column;align-items:center">
+                    <span style="color:var(--text-tertiary);font-size:20px;font-weight:400;line-height:1;padding-top:3px">${total}</span>
+                    <span style="color:var(--text-tertiary);font-size:11px;margin-top:3px">gesamt</span>
+                </div>
+            </div>
+            <div style="color:var(--text-secondary);font-size:12px">${percent}%</div>
         </div>
     </div>`;
 }
@@ -278,15 +290,16 @@ function buildTodaysTodosHtml() {
 
     if (todos.length === 0) {
         return `
-        <div class="glass-sm mb-4 p-5" style="text-align:center">
-            <span class="material-symbols-outlined" style="font-size:32px;color:var(--accent);display:block;margin-bottom:8px">task_alt</span>
-            <div style="font-size:14px;color:var(--text-secondary)">Keine offenen Aufgaben für heute</div>
+        <div class="glass-sm mb-4 p-5" style="text-align:center;animation:fadeInUp 0.45s cubic-bezier(0.22,1,0.36,1) both 0.1s">
+            <span class="material-symbols-outlined" style="font-size:48px;color:var(--accent);display:block;margin-bottom:10px">task_alt</span>
+            <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:4px">Alles erledigt ✓</div>
+            <div style="font-size:13px;color:var(--text-tertiary)">Genieß den Tag!</div>
         </div>`;
     }
 
     return `
-    <div class="glass-sm mb-4">
-        <div style="padding:12px 16px 8px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.08em;text-transform:uppercase">Aufgaben heute</div>
+    <div class="glass mb-4" style="padding:20px 20px 12px">
+        <div style="font-size:14px;font-weight:700;color:var(--text-secondary);letter-spacing:0.04em;text-transform:uppercase;margin-bottom:8px">Aufgaben heute</div>
         <div id="home-todo-list"></div>
     </div>`;
 }
@@ -320,12 +333,16 @@ function buildOutlookHtml() {
 
     const tomorrowHtml = buildDaySectionHtml(tomorrow, tomorrowItems);
     const dayAfterHtml = buildDaySectionHtml(dayAfter, dayAfterItems);
+    const totalCount = tomorrowItems.length + dayAfterItems.length;
 
     return `
     <div class="glass-sm mb-4">
         <button id="home-outlook-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:none;border:none;cursor:pointer;text-align:left">
             <span style="font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.08em;text-transform:uppercase">Ausblick</span>
-            <span class="material-symbols-outlined" id="home-outlook-arrow" style="font-size:18px;color:var(--text-tertiary);transition:transform 0.2s">expand_more</span>
+            <span style="display:flex;align-items:center;gap:8px">
+                <span id="home-outlook-badge" style="font-size:13px;font-weight:600;color:var(--accent);background:var(--accent-dim);border:1px solid var(--accent-glow);border-radius:20px;padding:2px 10px;line-height:1.4">${totalCount}</span>
+                <span class="material-symbols-outlined" id="home-outlook-arrow" style="font-size:18px;color:var(--text-tertiary);transition:transform 0.2s">expand_more</span>
+            </span>
         </button>
         <div id="home-outlook-body" class="hidden">
             ${tomorrowHtml}${dayAfterHtml}

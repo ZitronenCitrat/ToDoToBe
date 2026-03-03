@@ -13,7 +13,7 @@ export function initPageStats() {
 
     container.innerHTML = `
         <div class="page-header">
-            <h1 class="page-header-title">Statistiken</h1>
+            <h1 class="page-header-title page-title">Statistiken</h1>
         </div>
         <div class="px-5 flex-1">
             <div class="flex gap-2 mb-5" id="stats-filters">

@@ -15,7 +15,7 @@ export function initPageEvents() {
             <button class="icon-btn" id="events-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 class="page-header-title" style="flex:1;margin-left:8px">Termine</h1>
+            <h1 class="page-header-title page-title" style="flex:1;margin-left:8px">Termine</h1>
             <button class="icon-btn" id="events-add-btn">
                 <span class="material-symbols-outlined">add</span>
             </button>
@@ -139,7 +139,7 @@ function renderEventCard(ev, isPast = false) {
     }[ev.recurrence] || '';
 
     const categoryColors = {
-        'Uni': '#3b82f6', 'Wünsche': '#a855f7', 'Todos': 'var(--accent)',
+        'Uni': '#3b82f6', 'Wünsche': 'var(--accent)', 'Todos': 'var(--accent)',
         'Persönlich': '#22c55e', 'Arbeit': '#f97316', 'Sonstiges': 'var(--text-tertiary)'
     };
     const color = categoryColors[ev.category] || '#22c55e';

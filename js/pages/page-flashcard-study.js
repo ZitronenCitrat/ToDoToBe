@@ -22,7 +22,7 @@ export function initPageFlashcardStudy() {
             <button class="icon-btn" id="study-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <span class="page-header-title" id="study-course-name">Lernkarten</span>
+            <span class="page-header-title page-title" id="study-course-name">Lernkarten</span>
             <div class="page-header-actions">
                 <span id="study-progress-label" style="font-size:13px;color:var(--text-tertiary)"></span>
             </div>

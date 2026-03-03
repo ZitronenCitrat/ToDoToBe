@@ -34,6 +34,11 @@
     <!-- Custom Styles -->
     <link rel="stylesheet" href="style.css">
 
+    <!-- Early theme init — prevents FOUC before modules load -->
+    <script>
+    (function(){var t=localStorage.getItem('todotobe-theme-pre');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();
+    </script>
+
     <!-- Google Identity Services (for Google Calendar OAuth) -->
     <script src="https://accounts.google.com/gsi/client" async></script>
 
@@ -55,6 +60,10 @@
 
     <!-- Access Gate (shown before login if a site password is configured in Firebase) -->
     <div id="access-gate" class="hidden">
+        <button id="access-theme-btn" class="icon-btn" aria-label="Theme wechseln"
+            style="position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;z-index:10">
+            <span class="material-symbols-outlined">light_mode</span>
+        </button>
         <div class="auth-container">
             <div class="auth-logo">
                 <span class="material-symbols-outlined" style="font-size:44px;color:var(--accent)">lock</span>
@@ -74,6 +83,10 @@
 
     <!-- Auth Screen -->
     <div id="auth-screen" class="hidden">
+        <button id="auth-theme-btn" class="icon-btn" aria-label="Theme wechseln"
+            style="position:absolute;top:calc(16px + env(safe-area-inset-top,0px));right:16px;z-index:10">
+            <span class="material-symbols-outlined">light_mode</span>
+        </button>
         <div class="auth-container">
             <div class="auth-logo">
                 <span class="material-symbols-outlined" style="font-size:44px;color:var(--accent)">check_circle</span>
@@ -186,6 +199,44 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(() => {});
         }
+    </script>
+    <!-- Pre-auth theme toggle (runs before modules, syncs with post-login applyTheme) -->
+    <script>
+    (function() {
+        var KEY = 'todotobe-theme-pre';
+
+        function currentTheme() {
+            return localStorage.getItem(KEY) || 'light';
+        }
+
+        function applyPreTheme(t) {
+            localStorage.setItem(KEY, t);
+            if (t === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+            updateIcons(t);
+        }
+
+        function updateIcons(t) {
+            var icon = t === 'dark' ? 'light_mode' : 'dark_mode';
+            ['access-theme-btn', 'auth-theme-btn'].forEach(function(id) {
+                var btn = document.getElementById(id);
+                if (btn) btn.querySelector('.material-symbols-outlined').textContent = icon;
+            });
+        }
+
+        function toggle() { applyPreTheme(currentTheme() === 'dark' ? 'light' : 'dark'); }
+
+        ['access-theme-btn', 'auth-theme-btn'].forEach(function(id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.addEventListener('click', toggle);
+        });
+
+        // Sync icon with current theme on page load
+        updateIcons(currentTheme());
+    })();
     </script>
 </body>
 </html>

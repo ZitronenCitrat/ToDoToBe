@@ -21,7 +21,7 @@ export function initPageWishlist() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Wunschliste</span>
+            <span class="page-header-title page-title">Wunschliste</span>
             <div class="page-header-actions">
                 <button class="icon-btn" id="wishlist-sort-btn">
                     <span class="material-symbols-outlined">sort</span>
@@ -122,7 +122,7 @@ function renderItems() {
 
     const sortLabel = currentSort === 'nutzen' ? 'Nutzen' : currentSort === 'alpha' ? 'A–Z' : 'Preis';
 
-    let html = `<div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">Sortierung: ${sortLabel}</div>`;
+    let html = `<div style="font-size:13px;color:var(--text-tertiary);margin-bottom:8px">Sortierung: ${sortLabel}</div>`;
 
     active.forEach(item => {
         html += renderWishlistCard(item);
@@ -184,7 +184,7 @@ function renderItems() {
 function renderStars(nutzen) {
     const n = nutzen || 0;
     return Array.from({ length: 5 }, (_, i) =>
-        `<span style="color:${i < n ? '#a855f7' : 'var(--text-tertiary)'}">★</span>`
+        `<span style="color:${i < n ? 'var(--accent)' : 'var(--text-tertiary)'}">★</span>`
     ).join('');
 }
 
@@ -211,20 +211,20 @@ function renderWishlistCard(item, isPurchased = false) {
         <div class="flex-1 min-w-0">
             <div style="font-size:14px;font-weight:500;${titleStyle}">${escapeHtml(item.title)}</div>
             <div class="flex items-center gap-2 mt-1 flex-wrap">
-                <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surface-hover);color:var(--text-secondary)">
-                    <span class="material-symbols-outlined" style="font-size:12px;vertical-align:middle">${icon}</span>
+                <span style="font-size:13px;padding:2px 6px;border-radius:4px;background:var(--surface-hover);color:var(--text-secondary)">
+                    <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle">${icon}</span>
                     ${escapeHtml(item.category || 'Sonstiges')}
                 </span>
-                ${item.price != null ? `<span style="font-size:12px;color:var(--accent);font-weight:600">${formatPrice(item.price)}</span>` : ''}
+                ${item.price != null ? `<span style="font-size:13px;color:var(--accent);font-weight:600">${formatPrice(item.price)}</span>` : ''}
                 <span style="font-size:13px;letter-spacing:1px">${renderStars(item.nutzen)}</span>
-                ${dateStr ? `<span style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(dateStr)}</span>` : ''}
+                ${dateStr ? `<span style="font-size:13px;color:var(--text-tertiary)">${escapeHtml(dateStr)}</span>` : ''}
             </div>
         </div>
         <div class="flex gap-1">
-            <button class="icon-btn" data-edit-wish="${escapeAttr(item.id)}" style="width:28px;height:28px">
+            <button class="icon-btn" data-edit-wish="${escapeAttr(item.id)}">
                 <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-secondary)">edit</span>
             </button>
-            <button class="icon-btn" data-delete-wish="${escapeAttr(item.id)}" style="width:28px;height:28px">
+            <button class="icon-btn" data-delete-wish="${escapeAttr(item.id)}">
                 <span class="material-symbols-outlined" style="font-size:16px;color:var(--text-tertiary)">close</span>
             </button>
         </div>
@@ -246,7 +246,7 @@ function openWishlistModal(existing = null) {
         return Array.from({ length: 5 }, (_, i) =>
             `<button class="wish-star-btn" data-star="${i + 1}" type="button" style="
                 background:none;border:none;cursor:pointer;font-size:28px;padding:2px 4px;
-                color:${i < selected ? '#a855f7' : 'var(--text-tertiary)'};
+                color:${i < selected ? 'var(--accent)' : 'var(--text-tertiary)'};
                 transition:color 0.15s;
             ">★</button>`
         ).join('');
@@ -277,13 +277,13 @@ function openWishlistModal(existing = null) {
 
             <div class="flex gap-2 mb-3">
                 <div class="flex-1">
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Preis (€)</div>
+                    <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Preis (€)</div>
                     <input type="number" id="wish-price" class="glass-input w-full"
                         placeholder="0.00" step="0.01" min="0"
                         value="${existing?.price != null ? existing.price : ''}">
                 </div>
                 <div class="flex-1">
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
+                    <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:4px">Datum</div>
                     <input type="date" id="wish-date" class="glass-input w-full"
                         value="${existingDate}">
                 </div>
@@ -312,7 +312,7 @@ function openWishlistModal(existing = null) {
     function updateStars(selected) {
         nutzenInput.value = selected;
         starsContainer.querySelectorAll('.wish-star-btn').forEach((btn, i) => {
-            btn.style.color = i < selected ? '#a855f7' : 'var(--text-tertiary)';
+            btn.style.color = i < selected ? 'var(--accent)' : 'var(--text-tertiary)';
         });
     }
 
@@ -320,7 +320,7 @@ function openWishlistModal(existing = null) {
         btn.addEventListener('click', () => updateStars(parseInt(btn.dataset.star)));
         btn.addEventListener('mouseenter', () => {
             starsContainer.querySelectorAll('.wish-star-btn').forEach((b, i) => {
-                b.style.color = i < parseInt(btn.dataset.star) ? '#a855f7' : 'var(--text-tertiary)';
+                b.style.color = i < parseInt(btn.dataset.star) ? 'var(--accent)' : 'var(--text-tertiary)';
             });
         });
         btn.addEventListener('mouseleave', () => updateStars(parseInt(nutzenInput.value)));

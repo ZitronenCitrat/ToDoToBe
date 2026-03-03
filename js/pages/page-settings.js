@@ -17,10 +17,10 @@ export function initPageSettings() {
             <button class="icon-btn" id="settings-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 class="page-header-title" style="flex:1;margin-left:8px">Einstellungen</h1>
+            <h1 class="page-header-title page-title" style="flex:1;margin-left:8px">Einstellungen</h1>
         </div>
         <div class="px-5 flex-1">
-            <div class="glass p-5 mb-4 flex items-center gap-4" id="settings-profile">
+            <div class="glass-sm p-5 mb-4 flex items-center gap-4" id="settings-profile">
                 <div class="avatar-btn" style="width:56px;height:56px;pointer-events:none">
                     <img src="" alt="" id="settings-avatar">
                 </div>
@@ -31,7 +31,8 @@ export function initPageSettings() {
             </div>
 
             <div class="glass-sm mb-4">
-                <div class="flex items-center justify-between p-4" style="border-bottom:1px solid var(--surface-border)">
+                <div style="padding:16px 16px 8px;font-size:13px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.06em;text-transform:uppercase">Präferenzen</div>
+                <div class="flex items-center justify-between" style="padding:14px 16px;border-bottom:1px solid var(--surface-border)">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">dark_mode</span>
                         <span style="font-size:15px">Dark Mode</span>
@@ -41,7 +42,7 @@ export function initPageSettings() {
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div class="flex items-center justify-between p-4" style="border-bottom:1px solid var(--surface-border)">
+                <div class="flex items-center justify-between" style="padding:14px 16px;border-bottom:1px solid var(--surface-border)">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">notifications</span>
                         <span style="font-size:15px">Benachrichtigungen</span>
@@ -51,7 +52,7 @@ export function initPageSettings() {
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div class="flex items-center justify-between p-4">
+                <div class="flex items-center justify-between" style="padding:14px 16px">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">sync</span>
                         <span style="font-size:15px">Manuell synchronisieren</span>
@@ -61,22 +62,22 @@ export function initPageSettings() {
             </div>
 
             <div class="glass-sm mb-4">
-                <div style="padding:12px 16px 8px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.08em;text-transform:uppercase">Sicherheit</div>
-                <div class="flex items-center justify-between p-4" style="border-bottom:1px solid var(--surface-border)">
+                <div style="padding:16px 16px 8px;font-size:13px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.06em;text-transform:uppercase">Sicherheit</div>
+                <div class="flex items-center justify-between" style="padding:14px 16px;border-bottom:1px solid var(--surface-border)">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">account_circle</span>
                         <div>
                             <div style="font-size:15px">Google</div>
-                            <div style="font-size:12px;color:var(--accent)">Verknüpft ✓</div>
+                            <div style="font-size:13px;color:var(--accent)">Verknüpft ✓</div>
                         </div>
                     </div>
                 </div>
-                <div class="flex items-center justify-between p-4">
+                <div class="flex items-center justify-between" style="padding:14px 16px">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">lock</span>
                         <div>
                             <div style="font-size:15px">Passwort</div>
-                            <div id="settings-password-status" style="font-size:12px;color:var(--text-tertiary)">Nicht gesetzt</div>
+                            <div id="settings-password-status" style="font-size:13px;color:var(--text-tertiary)">Nicht gesetzt</div>
                         </div>
                     </div>
                     <button id="settings-password-btn" class="btn-ghost" style="padding:8px 16px;font-size:13px">Setzen</button>
@@ -84,18 +85,18 @@ export function initPageSettings() {
             </div>
 
             <div class="glass-sm mb-4" id="settings-gcal-section">
-                <div style="padding:12px 16px 8px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.08em;text-transform:uppercase">Google Kalender</div>
-                <div class="flex items-center justify-between p-4">
+                <div style="padding:16px 16px 8px;font-size:13px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.06em;text-transform:uppercase">Google Kalender</div>
+                <div class="flex items-center justify-between" style="padding:14px 16px">
                     <div class="flex items-center gap-3">
                         <span class="material-symbols-outlined" style="color:var(--text-tertiary)">calendar_month</span>
                         <div>
                             <div style="font-size:15px">Synchronisation</div>
-                            <div id="settings-gcal-status" style="font-size:12px;color:var(--text-tertiary)">Nicht verbunden</div>
+                            <div id="settings-gcal-status" style="font-size:13px;color:var(--text-tertiary)">Nicht verbunden</div>
                         </div>
                     </div>
                     <button id="settings-gcal-btn" class="btn-ghost" style="padding:8px 16px;font-size:13px">Verbinden</button>
                 </div>
-                <div id="settings-gcal-hint" class="hidden px-4 pb-4" style="font-size:12px;color:var(--text-tertiary);line-height:1.5">
+                <div id="settings-gcal-hint" class="hidden" style="padding:0 16px 16px;font-size:13px;color:var(--text-tertiary);line-height:1.5">
                     Füge deine Client-ID in js/gcal.js ein, um die Google-Kalender-Synchronisation zu aktivieren.
                 </div>
             </div>
@@ -199,7 +200,7 @@ function renderSettings() {
     container.querySelector('#settings-name').textContent = appState.user.displayName || '';
     container.querySelector('#settings-email').textContent = appState.user.email || '';
 
-    container.querySelector('#settings-theme-toggle').checked = appState.settings.theme !== 'light';
+    container.querySelector('#settings-theme-toggle').checked = appState.settings.theme === 'dark';
     container.querySelector('#settings-notif-toggle').checked = appState.settings.notifications || false;
 
     // Security section — refresh provider status
@@ -324,9 +325,11 @@ function renderGcalStatus(container, connected) {
 }
 
 export function applyTheme(theme) {
-    if (theme === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
     } else {
         document.documentElement.removeAttribute('data-theme');
     }
+    // Keep pre-auth localStorage key in sync so the login screen shows correct theme next visit
+    localStorage.setItem('todotobe-theme-pre', theme);
 }

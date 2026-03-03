@@ -16,7 +16,7 @@ export function initPageWishlistMatrix() {
     const container = document.getElementById('page-wishlist-matrix');
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Übersicht</span>
+            <span class="page-header-title page-title">Übersicht</span>
         </div>
         <div class="px-5 flex-1" id="matrix-content"></div>
     `;
@@ -32,7 +32,7 @@ function isActive() {
 function renderStars(nutzen) {
     const n = nutzen || 0;
     return Array.from({ length: 5 }, (_, i) =>
-        `<span style="color:${i < n ? '#a855f7' : 'var(--text-tertiary)'}">★</span>`
+        `<span style="color:${i < n ? 'var(--accent)' : 'var(--text-tertiary)'}">★</span>`
     ).join('');
 }
 
@@ -65,7 +65,7 @@ function render() {
             <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Offen</div>
         </div>
         <div class="glass-sm p-3 flex-1 text-center">
-            <div style="font-size:24px;font-weight:700;color:#a855f7">${purchased.length}</div>
+            <div style="font-size:24px;font-weight:700;color:var(--accent)">${purchased.length}</div>
             <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Gekauft</div>
         </div>
         <div class="glass-sm p-3 flex-1 text-center">
@@ -104,7 +104,7 @@ function render() {
                         <span style="font-size:13px;font-weight:500">${escapeHtml(cat)}</span>
                     </div>
                     <div class="flex items-center gap-3" style="font-size:12px;color:var(--text-tertiary)">
-                        <span style="color:#a855f7;font-size:11px">${avgN} ★</span>
+                        <span style="color:var(--accent);font-size:11px">${avgN} ★</span>
                         <span>${data.count} ${data.count === 1 ? 'Wunsch' : 'Wünsche'}</span>
                     </div>
                 </div>
@@ -153,7 +153,7 @@ function render() {
         html += `<div class="glass-sm p-4 mb-4 flex items-center gap-4">
             <svg width="90" height="90" style="flex-shrink:0">
                 <circle cx="45" cy="45" r="${radius}" fill="none" stroke="var(--surface-hover)" stroke-width="8"/>
-                <circle cx="45" cy="45" r="${radius}" fill="none" stroke="#a855f7" stroke-width="8"
+                <circle cx="45" cy="45" r="${radius}" fill="none" style="stroke:var(--accent)" stroke-width="8"
                     stroke-dasharray="${circumference}"
                     stroke-dashoffset="${progress}"
                     stroke-linecap="round"

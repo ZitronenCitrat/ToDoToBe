@@ -13,7 +13,7 @@ export function initPageUniGrades() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Noten</span>
+            <span class="page-header-title page-title">Noten</span>
             <div class="page-header-actions">
                 <button class="icon-btn" id="grades-add-btn">
                     <span class="material-symbols-outlined">add</span>

@@ -19,7 +19,7 @@ export function initPageUniTimetable() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Stundenplan</span>
+            <span class="page-header-title page-title">Stundenplan</span>
             <div class="page-header-actions">
                 <button class="icon-btn" id="timetable-add-btn">
                     <span class="material-symbols-outlined">add</span>

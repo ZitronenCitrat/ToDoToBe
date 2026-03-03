@@ -28,7 +28,7 @@ export function initPageProjectDetail() {
             </div>
         </div>
         <div class="px-5">
-            <h1 id="project-name" class="text-2xl font-bold mb-4"></h1>
+            <h1 id="project-name" class="page-title mb-4"></h1>
             <div id="project-progress-card" class="glass p-5 mb-5 flex items-center gap-5"></div>
             <div class="flex gap-1 mb-4" id="project-tabs">
                 <button class="tab-btn active" data-tab="tasks">Aufgaben</button>

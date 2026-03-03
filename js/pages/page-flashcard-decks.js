@@ -13,7 +13,7 @@ export function initPageFlashcardDecks() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Lernkarten</span>
+            <span class="page-header-title page-title">Lernkarten</span>
         </div>
         <div class="px-5 flex-1" id="flashcard-decks-content"></div>
     `;

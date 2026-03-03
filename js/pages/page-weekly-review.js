@@ -41,7 +41,7 @@ export function initPageWeeklyReview() {
             <button class="icon-btn" id="review-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <span class="page-header-title">Wöchentlicher Review</span>
+            <span class="page-header-title page-title">Wöchentlicher Review</span>
             <div class="page-header-actions">
                 <span style="font-size:12px;color:var(--text-tertiary)" id="review-week-label"></span>
             </div>

@@ -13,26 +13,29 @@
 }
 
 :root {
-    --accent: #f59e0b;
-    --accent-rgb: 245, 158, 11;
-    --accent-glow: rgba(245, 158, 11, 0.25);
-    --accent-dim: rgba(245, 158, 11, 0.1);
+    --accent: #C2610C;
+    --accent-rgb: 194, 97, 12;
+    --accent-glow: rgba(194, 97, 12, 0.16);
+    --accent-dim: rgba(194, 97, 12, 0.07);
 
-    --bg: #080603;
-    --surface: rgba(22, 18, 12, 0.45);
-    --surface-solid: #16120c;
-    --surface-hover: rgba(255, 255, 255, 0.05);
-    --surface-border: rgba(255, 255, 255, 0.08);
-    --surface-border-hover: rgba(255, 255, 255, 0.15);
+    --bg: #FDFAF6;
+    --bg-secondary: #F5F0E8;
+    --surface: rgba(255, 255, 255, 0.68);
+    --surface-solid: #FFFFFF;
+    --surface-hover: rgba(0, 0, 0, 0.035);
+    --surface-border: rgba(0, 0, 0, 0.07);
+    --surface-border-hover: rgba(0, 0, 0, 0.13);
 
-    --text: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.6);
-    --text-tertiary: rgba(255, 255, 255, 0.35);
+    --text: #1C1917;
+    --text-secondary: rgba(28, 25, 23, 0.60);
+    --text-tertiary: rgba(28, 25, 23, 0.36);
 
-    --priority-1: #ff4757;
-    --priority-2: #ffa502;
-    --priority-3: #3742fa;
-    --priority-4: rgba(255, 255, 255, 0.15);
+    --priority-1: #DC2626;
+    --priority-2: #D97706;
+    --priority-3: #2563EB;
+    --priority-4: rgba(0, 0, 0, 0.08);
+
+    --text-primary: var(--text);
 
     --nav-height: 72px;
     --safe-top: env(safe-area-inset-top, 0px);
@@ -82,7 +85,7 @@ input, textarea, select {
     position: absolute;
     border-radius: 50%;
     filter: blur(80px);
-    opacity: 0.5;
+    opacity: 0.15;
 }
 
 .blob-1 {
@@ -130,7 +133,26 @@ input, textarea, select {
     66% { transform: translate(35px, 30px) scale(0.95); }
 }
 
-/* ===== Glass Utility ===== */
+/* ===== Glass System — 3 Tiers =====
+ *
+ * Tier 1 — .glass
+ *   Page-level containers and major featured sections.
+ *   Use for: hero cards, the primary/spotlight block on a page,
+ *   full-width summary panels (e.g. daily goal ring, LP progress card).
+ *   blur(24px) · border-radius 16px
+ *
+ * Tier 2 — .glass-sm
+ *   Standard cards and list items nested within a page.
+ *   Use for: setting rows, todo items, course cards, wishlist cards,
+ *   any repeating card pattern or secondary info block.
+ *   blur(16px) · border-radius 12px
+ *
+ * Tier 3 — .glass-input / .glass-select / .glass-textarea
+ *   Interactive form controls only. Never use for containers.
+ *   blur(16px) · no border-radius override (set inline or per-element)
+ * ===================================================== */
+
+/* Tier 1: Page-level containers, major featured sections */
 .glass {
     background: var(--surface);
     backdrop-filter: blur(24px);
@@ -139,6 +161,7 @@ input, textarea, select {
     border-radius: 16px;
 }
 
+/* Tier 2: Cards within a page, repeating list items */
 .glass-sm {
     background: var(--surface);
     backdrop-filter: blur(16px);
@@ -182,7 +205,7 @@ input, textarea, select {
     font-weight: 800;
     letter-spacing: -0.5px;
     margin-bottom: 8px;
-    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -198,8 +221,8 @@ input, textarea, select {
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    background: rgba(255, 255, 255, 0.95);
-    color: #1a1a1a;
+    background: var(--accent);
+    color: white;
     border: none;
     padding: 14px 32px;
     border-radius: 14px;
@@ -262,6 +285,14 @@ input, textarea, select {
     letter-spacing: -0.3px;
 }
 
+.page-title {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
 .page-header-actions {
     display: flex;
     align-items: center;
@@ -269,8 +300,8 @@ input, textarea, select {
 }
 
 .icon-btn {
-    width: 40px;
-    height: 40px;
+    min-width: 44px;
+    min-height: 44px;
     border: 1px solid var(--surface-border);
     background: var(--surface);
     backdrop-filter: blur(16px);
@@ -290,13 +321,16 @@ input, textarea, select {
 }
 
 .avatar-btn {
-    width: 36px;
-    height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: 50%;
     overflow: hidden;
     border: 2px solid var(--surface-border);
     cursor: pointer;
     padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--surface);
 }
 
@@ -316,15 +350,15 @@ input, textarea, select {
     max-width: 440px;
     height: auto;
 
-    /* Dark liquid glass */
-    background: rgba(14, 10, 5, 0.82);
+    /* Warm ivory glass */
+    background: rgba(253, 250, 246, 0.82);
     backdrop-filter: blur(40px) saturate(160%);
     -webkit-backdrop-filter: blur(40px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    border: 1px solid rgba(0, 0, 0, 0.07);
     box-shadow:
-        0 16px 48px rgba(0, 0, 0, 0.40),
-        0 4px 12px rgba(0, 0, 0, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.07);
+        0 16px 48px rgba(0, 0, 0, 0.12),
+        0 4px 12px rgba(0, 0, 0, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.90);
     border-radius: 30px;
 
     display: flex;
@@ -332,6 +366,22 @@ input, textarea, select {
     justify-content: space-around;
     padding: 6px 8px calc(6px);
     z-index: 100;
+}
+
+.bottom-nav::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+[data-theme="dark"] .bottom-nav::before {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .nav-tab {
@@ -344,7 +394,7 @@ input, textarea, select {
     flex: 1;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.40);
+    color: var(--text-tertiary);
     cursor: pointer;
     transition: color 0.2s, background 0.2s;
     position: relative;
@@ -370,6 +420,11 @@ input, textarea, select {
     font-size: 10px;
     font-weight: 500;
     letter-spacing: 0.01em;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .nav-tab-spacer {
@@ -470,7 +525,7 @@ input, textarea, select {
     font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24;
 }
 
-/* ===== Glass Inputs ===== */
+/* ===== Glass Inputs (Tier 3: interactive controls only) ===== */
 .glass-input {
     background: var(--surface);
     backdrop-filter: blur(16px);
@@ -495,7 +550,7 @@ input, textarea, select {
 
 .glass-input[type="date"],
 .glass-input[type="time"] {
-    color-scheme: dark;
+    color-scheme: light;
 }
 
 .glass-select {
@@ -510,7 +565,7 @@ input, textarea, select {
     outline: none;
     appearance: none;
     -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(28,25,23,0.4)'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
     padding-right: 32px;
@@ -518,8 +573,8 @@ input, textarea, select {
 }
 
 .glass-select option {
-    background: #1a1a2e;
-    color: white;
+    background: #ffffff;
+    color: #1a1a2e;
 }
 
 .glass-textarea {
@@ -633,7 +688,7 @@ input, textarea, select {
 
 .modal-sheet {
     position: relative;
-    background: rgba(18, 14, 8, 0.97);
+    background: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     border-top: 1px solid var(--surface-border);
@@ -649,7 +704,7 @@ input, textarea, select {
 .modal-handle {
     width: 36px;
     height: 4px;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.12);
     border-radius: 2px;
     margin: 0 auto 16px;
 }
@@ -709,7 +764,7 @@ input, textarea, select {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.25);
+    border: 2px solid rgba(0, 0, 0, 0.20);
     flex-shrink: 0;
     cursor: pointer;
     display: flex;
@@ -730,7 +785,7 @@ input, textarea, select {
 
 .todo-checkbox.checked::after {
     content: '\2713';
-    color: #050505;
+    color: white;
     font-size: 13px;
     font-weight: 700;
 }
@@ -760,7 +815,7 @@ input, textarea, select {
 }
 
 .todo-due {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-tertiary);
     display: flex;
     align-items: center;
@@ -775,16 +830,16 @@ input, textarea, select {
 .todo-due.today { color: var(--accent); }
 
 .todo-list-tag {
-    font-size: 11px;
+    font-size: 13px;
     padding: 2px 8px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.04);
     color: var(--text-secondary);
     border-left: 3px solid transparent;
 }
 
 .drag-handle {
-    color: rgba(255, 255, 255, 0.15);
+    color: rgba(0, 0, 0, 0.20);
     cursor: grab;
     padding: 4px;
     font-size: 14px;
@@ -831,7 +886,7 @@ input, textarea, select {
 
 .progress-ring-bg {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.06);
+    stroke: rgba(0, 0, 0, 0.07);
 }
 
 .progress-ring-fill {
@@ -863,6 +918,11 @@ input, textarea, select {
     font-weight: 500;
 }
 
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ===== Date Group Header ===== */
 .date-group-header {
     font-size: 13px;
@@ -891,7 +951,7 @@ input, textarea, select {
     position: absolute;
     inset: 0;
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.10);
     cursor: pointer;
     transition: background 0.2s;
 }
@@ -946,12 +1006,12 @@ input, textarea, select {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.10);
     border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.18);
 }
 
 /* ===== SortableJS Drag & Drop ===== */
@@ -972,92 +1032,111 @@ input, textarea, select {
     }
 }
 
-/* ===== Light Theme — Warm Light Glass ===== */
-[data-theme="light"] {
-    /* Warm ivory background */
-    --bg: #FDFAF6;
-    --bg-secondary: #F5F0E8;
+/* ===== Dark Theme Override ===== */
+[data-theme="dark"] {
+    --accent: #f59e0b;
+    --accent-rgb: 245, 158, 11;
+    --accent-glow: rgba(245, 158, 11, 0.25);
+    --accent-dim: rgba(245, 158, 11, 0.1);
 
-    /* Glass surfaces */
-    --surface: rgba(255, 255, 255, 0.68);
-    --surface-solid: #FFFFFF;
-    --surface-hover: rgba(0, 0, 0, 0.035);
-    --surface-border: rgba(0, 0, 0, 0.07);
-    --surface-border-hover: rgba(0, 0, 0, 0.13);
+    --bg: #1a1208;
+    --surface: rgba(30, 22, 8, 0.45);
+    --surface-solid: #221608;
+    --surface-hover: rgba(255, 255, 255, 0.05);
+    --surface-border: rgba(255, 255, 255, 0.08);
+    --surface-border-hover: rgba(255, 255, 255, 0.15);
 
-    /* Warm near-black text */
-    --text: #1C1917;
-    --text-secondary: rgba(28, 25, 23, 0.60);
-    --text-tertiary: rgba(28, 25, 23, 0.36);
+    --text: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+    --text-tertiary: rgba(255, 255, 255, 0.35);
 
-    /* Deeper amber accent for light bg */
-    --accent: #C2610C;
-    --accent-rgb: 194, 97, 12;
-    --accent-glow: rgba(194, 97, 12, 0.16);
-    --accent-dim: rgba(194, 97, 12, 0.07);
-
-    /* Priority colours adjusted for light */
-    --priority-1: #DC2626;
-    --priority-2: #D97706;
-    --priority-3: #2563EB;
-    --priority-4: rgba(0, 0, 0, 0.08);
+    --priority-1: #ff4757;
+    --priority-2: #ffa502;
+    --priority-3: #3742fa;
+    --priority-4: rgba(255, 255, 255, 0.15);
 }
 
-[data-theme="light"] body {
-    background: var(--bg);
-    color: var(--text);
+[data-theme="dark"] .blob {
+    opacity: 0.5;
 }
 
-[data-theme="light"] .blob {
-    opacity: 0.15;
-}
-
-[data-theme="light"] .bottom-nav {
-    /* Warm ivory glass for light theme */
-    background: rgba(253, 250, 246, 0.82);
-    border-color: rgba(0, 0, 0, 0.07);
+[data-theme="dark"] .bottom-nav {
+    background: rgba(26, 18, 8, 0.85);
+    border-color: rgba(255, 255, 255, 0.09);
     box-shadow:
-        0 16px 48px rgba(0, 0, 0, 0.12),
-        0 4px 12px rgba(0, 0, 0, 0.07),
-        inset 0 1px 0 rgba(255, 255, 255, 0.90);
+        0 16px 48px rgba(0, 0, 0, 0.40),
+        0 4px 12px rgba(0, 0, 0, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-[data-theme="light"] .nav-tab {
-    color: rgba(28, 25, 23, 0.35);
+
+[data-theme="dark"] .modal-sheet {
+    background: rgba(26, 18, 8, 0.98);
 }
 
-[data-theme="light"] .modal-sheet {
+[data-theme="dark"] .modal-handle {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .auth-btn {
     background: rgba(255, 255, 255, 0.95);
+    color: #1a1a1a;
 }
 
-[data-theme="light"] .auth-btn {
-    background: var(--accent);
+[data-theme="dark"] .auth-title {
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+}
+
+[data-theme="dark"] .todo-checkbox {
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+[data-theme="dark"] .todo-checkbox.checked::after {
+    color: #050505;
+}
+
+[data-theme="dark"] .glass-input[type="date"],
+[data-theme="dark"] .glass-input[type="time"] {
+    color-scheme: dark;
+}
+
+[data-theme="dark"] .glass-select {
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.4)'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] .glass-select option {
+    background: #1a1a2e;
     color: white;
 }
 
-[data-theme="light"] .todo-checkbox.checked::after {
-    color: white;
+[data-theme="dark"] .progress-ring-bg {
+    stroke: rgba(255, 255, 255, 0.06);
 }
 
-[data-theme="light"] .glass-input[type="date"] {
-    color-scheme: light;
+[data-theme="dark"] .toggle-slider {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="light"] .glass-select option {
-    background: #ffffff;
-    color: #1a1a2e;
+[data-theme="dark"] .drag-handle {
+    color: rgba(255, 255, 255, 0.15);
 }
 
-[data-theme="light"] .page-header {
-    background: linear-gradient(180deg, var(--bg) 60%, transparent 100%);
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="light"] .mode-tabs-bar {
-    background: rgba(255, 255, 255, 0.85);
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
-[data-theme="light"] .glass-input[type="time"] {
-    color-scheme: light;
+[data-theme="dark"] .page-header {
+    background: linear-gradient(180deg, var(--bg) 65%, transparent 100%);
+}
+
+[data-theme="dark"] .todo-list-tag {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 /* ===== Mode Tabs (Top Bar) — HIDDEN: navigation moved to bottom floating pill ===== */
@@ -1156,7 +1235,7 @@ input, textarea, select {
     border: 1px solid var(--surface-border);
     background: var(--surface);
     color: var(--text-secondary);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
@@ -1229,16 +1308,16 @@ input, textarea, select {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-tertiary);
 }
 
 .habit-delete-btn {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 24px;
-    height: 24px;
+    top: 0;
+    right: 0;
+    min-width: 44px;
+    min-height: 44px;
     border: none;
     background: none;
     color: var(--text-tertiary);
@@ -1271,7 +1350,7 @@ input, textarea, select {
 
 .heatmap-day-label {
     text-align: center;
-    font-size: 11px;
+    font-size: 13px;
     color: var(--text-tertiary);
     font-weight: 500;
 }
@@ -1352,7 +1431,7 @@ input, textarea, select {
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.15s;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .timetable-day-btn.active {
@@ -1397,7 +1476,7 @@ input, textarea, select {
 
 /* Wish date dot in calendar */
 .dot-wish {
-    background: #a855f7;
+    background: var(--accent);
 }
 
 /* Calendar event card — Termin */
@@ -1461,7 +1540,7 @@ input, textarea, select {
 
 /* ===== Savings Badge (Feature F) ===== */
 .savings-badge {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     color: #22c55e;
     background: rgba(34, 197, 94, 0.12);
@@ -1506,7 +1585,7 @@ input, textarea, select {
 .matrix-item:last-child { border-bottom: none; }
 
 .matrix-item-title {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 500;
     flex: 1;
     min-width: 0;
@@ -1516,9 +1595,120 @@ input, textarea, select {
 }
 
 .matrix-item-price {
-    font-size: 11px;
+    font-size: 13px;
     color: var(--text-tertiary);
     flex-shrink: 0;
+}
+
+/* ===== Uni Page — Redesigned Dashboard ===== */
+
+/* Week day strip */
+.uni-week-strip {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+}
+
+.uni-day-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.uni-day-btn.selected {
+    background: rgba(180, 100, 5, 0.35);
+    border-color: rgba(245, 158, 11, 0.5);
+}
+
+.uni-day-btn.selected .day-name,
+.uni-day-btn.selected .day-num {
+    color: var(--accent);
+}
+
+.uni-day-btn .day-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    margin-bottom: 2px;
+}
+
+.uni-day-btn .day-num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.uni-day-btn.weekend:not(.selected) .day-name,
+.uni-day-btn.weekend:not(.selected) .day-num {
+    opacity: 0.4;
+}
+
+.uni-day-btn:active { opacity: 0.7; }
+
+/* Course 2-column grid */
+.uni-course-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.uni-course-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px !important;
+    padding: 14px 14px 14px 18px;
+    transition: transform 0.15s ease;
+    cursor: pointer;
+    /* Reset conflicting flex from .glass-sm */
+    display: block;
+}
+
+.uni-course-card:active {
+    transform: scale(0.96);
+}
+
+.uni-course-card.is-active {
+    background: rgba(180, 100, 5, 0.28) !important;
+    border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.uni-course-card .accent-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 4px 0 0 4px;
+}
+
+/* Exam countdown ring wrapper */
+.uni-exam-ring-wrap {
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+}
+
+.uni-exam-ring-wrap svg {
+    transform: rotate(-90deg);
+}
+
+/* Course expand cards (used in "Alle Kurse" section) */
+.uni-section-subheader {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    margin: 14px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* ===== Offline Banner (Feature C) ===== */

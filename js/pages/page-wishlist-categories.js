@@ -17,7 +17,7 @@ export function initPageWishlistCategories() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Kategorien</span>
+            <span class="page-header-title page-title">Kategorien</span>
         </div>
         <div class="px-5 flex-1" id="wishlist-cat-content"></div>
     `;

@@ -29,7 +29,7 @@ export function initPageToday() {
             </div>
         </div>
         <div class="px-5 pb-1">
-            <h1 class="text-2xl font-bold">Heute</h1>
+            <h1 class="page-title">Heute</h1>
             <p class="text-sm mt-1" style="color:var(--text-tertiary)" id="today-date-label"></p>
         </div>
         <div class="page-context-btns">

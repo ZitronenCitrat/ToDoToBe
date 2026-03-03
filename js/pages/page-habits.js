@@ -22,7 +22,7 @@ export function initPageHabits() {
             <button class="icon-btn" id="habits-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <span class="page-header-title">Gewohnheiten</span>
+            <span class="page-header-title page-title">Gewohnheiten</span>
             <div class="page-header-actions">
                 <button class="icon-btn" id="habits-add-btn">
                     <span class="material-symbols-outlined">add</span>

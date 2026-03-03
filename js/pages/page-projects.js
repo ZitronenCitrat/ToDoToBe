@@ -13,7 +13,7 @@ export function initPageProjects() {
 
     container.innerHTML = `
         <div class="page-header">
-            <h1 class="page-header-title">Meine Projekte</h1>
+            <h1 class="page-header-title page-title">Meine Projekte</h1>
             <div class="page-header-actions">
                 <button class="avatar-btn" id="projects-avatar-btn">
                     <img src="" alt="" id="projects-avatar-img">

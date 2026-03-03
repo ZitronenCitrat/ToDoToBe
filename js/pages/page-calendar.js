@@ -22,7 +22,7 @@ export function initPageCalendar() {
 
     container.innerHTML = `
         <div class="page-header">
-            <h1 class="page-header-title">Kalender</h1>
+            <h1 class="page-header-title page-title">Kalender</h1>
             <div class="page-header-actions">
                 <button class="icon-btn" id="cal-today-btn" title="Heute">
                     <span class="material-symbols-outlined">today</span>
@@ -278,7 +278,7 @@ function renderCalendar() {
                 { show: hasExams, color: '#ef4444' },
                 { show: hasAssignments, color: '#f97316' },
                 { show: hasLecture, color: '#3b82f6' },
-                { show: hasWishes, color: '#a855f7' },
+                { show: hasWishes, color: 'var(--accent)' },
                 { show: hasEvents, color: '#22c55e' },
             ].filter(c => c.show);
 
@@ -449,18 +449,18 @@ function renderDayItems() {
     // --- Wünsche ---
     if ((calFilter === 'all' || calFilter === 'wishes') && wishes.length > 0) {
         hasContent = true;
-        if (calFilter === 'all') sectionLabel('Wünsche', '#a855f7');
+        if (calFilter === 'all') sectionLabel('Wünsche', 'var(--accent)');
         wishes.forEach(w => {
             const nutzen = w.nutzen || 0;
             const stars = '★'.repeat(nutzen) + '☆'.repeat(Math.max(0, 5 - nutzen));
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
-            card.style.cssText = 'border-left:3px solid #a855f7';
+            card.style.cssText = 'border-left:3px solid var(--accent)';
             card.innerHTML = `
-                <span class="material-symbols-outlined" style="font-size:20px;color:#a855f7;flex-shrink:0">star</span>
+                <span class="material-symbols-outlined" style="font-size:20px;color:var(--accent);flex-shrink:0">star</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(w.name || w.title || '')}</div>
-                    <div style="font-size:11px;color:#a855f7;letter-spacing:2px">${stars}</div>
+                    <div style="font-size:11px;color:var(--accent);letter-spacing:2px">${stars}</div>
                 </div>
                 ${w.price != null ? `<span style="font-size:12px;color:var(--text-tertiary);flex-shrink:0">${w.price.toFixed(2)} €</span>` : ''}
             `;

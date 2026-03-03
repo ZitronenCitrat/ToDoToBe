@@ -12,6 +12,16 @@ import {
 const TOTAL_LP = 180;
 
 let initialized = false;
+let selectedWeekday = null; // null = today
+
+function getTodayDayIdx() {
+    const d = new Date();
+    return d.getDay() === 0 ? 6 : d.getDay() - 1;
+}
+
+function getSelectedDay() {
+    return selectedWeekday !== null ? selectedWeekday : getTodayDayIdx();
+}
 
 export function initPageUni() {
     if (initialized) return;
@@ -20,10 +30,12 @@ export function initPageUni() {
     const container = document.getElementById('page-uni');
 
     container.innerHTML = `
-        <div class="page-header">
-            <button class="icon-btn" id="uni-settings-btn" style="display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:20px;font-size:12px;font-weight:600;color:var(--text-secondary)">
-                <span class="material-symbols-outlined" style="font-size:18px">edit_calendar</span>
-                <span>Semester</span>
+        <!-- Scoped ambient glow — only visible when this page is shown -->
+        <div style="position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 60% at 50% 60%, rgba(180,100,5,0.18) 0%, rgba(120,60,0,0.10) 40%, transparent 70%)"></div>
+
+        <div class="page-header" style="position:relative;z-index:1">
+            <button class="icon-btn" id="uni-settings-btn">
+                <span class="material-symbols-outlined">settings</span>
             </button>
             <div class="page-header-actions">
                 <button class="avatar-btn" id="uni-avatar-btn">
@@ -31,25 +43,26 @@ export function initPageUni() {
                 </button>
             </div>
         </div>
-        <div class="px-5 pb-1">
-            <h1 class="text-2xl font-bold">Uni-Planer</h1>
-            <p class="text-sm mt-1" style="color:var(--text-tertiary)" id="uni-semester-label"></p>
+
+        <div class="px-5 pb-1" style="position:relative;z-index:1">
+            <h1 style="font-size:32px;font-weight:800;color:var(--text-primary);letter-spacing:-0.5px;margin-top:8px;margin-bottom:12px">University Planner</h1>
+            <div style="display:flex;justify-content:flex-end;gap:4px;margin-bottom:20px">
+                <button class="icon-btn" id="uni-timetable-btn" title="Stundenplan">
+                    <span class="material-symbols-outlined">schedule</span>
+                </button>
+                <button class="icon-btn" id="uni-assignments-btn" title="Aufgaben">
+                    <span class="material-symbols-outlined">assignment</span>
+                </button>
+                <button class="icon-btn" id="uni-grades-btn" title="Noten">
+                    <span class="material-symbols-outlined">grade</span>
+                </button>
+                <button class="icon-btn" id="uni-flashcards-btn" title="Lernkarten">
+                    <span class="material-symbols-outlined">style</span>
+                </button>
+            </div>
         </div>
-        <div class="page-context-btns">
-            <button class="context-btn" id="uni-timetable-btn">
-                <span class="material-symbols-outlined">schedule</span>Stundenplan
-            </button>
-            <button class="context-btn" id="uni-assignments-btn">
-                <span class="material-symbols-outlined">assignment</span>Aufgaben
-            </button>
-            <button class="context-btn" id="uni-grades-btn">
-                <span class="material-symbols-outlined">grade</span>Noten
-            </button>
-            <button class="context-btn" id="uni-flashcards-btn">
-                <span class="material-symbols-outlined">style</span>Karten
-            </button>
-        </div>
-        <div class="px-5 flex-1 overflow-y-auto" id="uni-content"></div>
+
+        <div class="px-5 flex-1 overflow-y-auto" id="uni-content" style="position:relative;z-index:1"></div>
     `;
 
     container.querySelector('#uni-settings-btn').addEventListener('click', () => navigate('uni-settings'));
@@ -119,156 +132,209 @@ function render() {
 
     const courses = appState.allCourses;
     const exams = appState.allExams;
-    const assignments = appState.allAssignments;
-
-    // Active semester (auto-detect or manual)
     const activeSemester = getActiveSemester(appState.allSemesters || []);
-    const semLabel = document.querySelector('#uni-semester-label');
-    if (semLabel) semLabel.textContent = activeSemester ? activeSemester.name : '';
 
-    // LP calculation
-    const earnedLP = calcEarnedLP();
-    const lpProgress = earnedLP / TOTAL_LP;
-    const lpRadius = 44;
-    const lpCircumference = 2 * Math.PI * lpRadius;
-    const lpOffset = lpCircumference * (1 - lpProgress);
+    const todayIdx = getTodayDayIdx();
+    const selDay = getSelectedDay();
+    const DAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
-    // Overall LP-weighted GPA
-    const overallGPA = calcOverallGPA();
-
-    // Today's courses (filtered by semester lecture day)
+    // === Week Date Strip ===
     const today = new Date();
-    const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1;
-    const isLectureDay = isTodayLectureDay(activeSemester);
-    const todayCourses = isLectureDay
-        ? courses.filter(c => {
-            // Support both timeSlots and legacy weekdays
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - todayIdx);
+
+    let weekHtml = `<div class="uni-week-strip" id="uni-week-strip">`;
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(weekStart);
+        d.setDate(weekStart.getDate() + i);
+        const isSel = i === selDay;
+        const isWeekend = i >= 5;
+        weekHtml += `<button class="uni-day-btn${isSel ? ' selected' : ''}${isWeekend ? ' weekend' : ''}" data-day="${i}">
+            <span class="day-name">${DAY_LABELS[i]}</span>
+            <span class="day-num">${d.getDate()}</span>
+        </button>`;
+    }
+    weekHtml += '</div>';
+
+    // === Courses for selected day ===
+    const isLectureDay = selDay === todayIdx ? isTodayLectureDay(activeSemester) : true;
+    const dayCourses = courses
+        .filter(c => {
             const slots = c.timeSlots || [];
-            if (slots.length > 0) return slots.some(s => s.weekday === dayOfWeek);
-            return (c.weekdays || []).includes(dayOfWeek);
-          })
-          .sort((a, b) => {
-            const aTime = (a.timeSlots || [])[0]?.startTime || a.startTime || '';
-            const bTime = (b.timeSlots || [])[0]?.startTime || b.startTime || '';
+            if (slots.length > 0) return slots.some(s => s.weekday === selDay);
+            return (c.weekdays || []).includes(selDay);
+        })
+        .sort((a, b) => {
+            const aTime = (a.timeSlots || []).find(s => s.weekday === selDay)?.startTime || a.startTime || '';
+            const bTime = (b.timeSlots || []).find(s => s.weekday === selDay)?.startTime || b.startTime || '';
             return aTime.localeCompare(bTime);
-          })
-        : [];
+        });
 
-    // Upcoming exams (next 3)
-    const now = new Date();
-    const upcomingExams = exams
-        .filter(e => { const d = toDate(e.date); return d && d >= now && !e.completed; })
-        .sort((a, b) => (toDate(a.date) || new Date(9999,0)) - (toDate(b.date) || new Date(9999,0)))
-        .slice(0, 3);
+    const nowMinutes = today.getHours() * 60 + today.getMinutes();
+    const isToday = selDay === todayIdx;
 
-    // Exam countdown
-    const nextExam = upcomingExams[0] || null;
-    let countdownHtml = '';
-    if (nextExam) {
-        const todayStart = startOfDay(new Date());
-        const examDate = startOfDay(toDate(nextExam.date));
-        const diffDays = Math.round((examDate.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
-        const examCourse = courses.find(c => c.id === nextExam.courseId);
-        const examLabel = escapeHtml(nextExam.title || examCourse?.name || 'Klausur');
-        let countdownText, countdownIcon, urgencyStyle;
-        if (diffDays === 0) {
-            countdownText = `Heute: ${examLabel}!`;
-            countdownIcon = 'crisis_alert';
-            urgencyStyle = 'color:#ef4444';
-        } else if (diffDays === 1) {
-            countdownText = `Morgen: ${examLabel}!`;
-            countdownIcon = 'warning';
-            urgencyStyle = 'color:#f97316';
-        } else {
-            countdownText = `Noch ${diffDays} Tage bis ${examLabel}`;
-            countdownIcon = diffDays <= 7 ? 'timer' : 'event';
-            urgencyStyle = diffDays <= 7 ? 'color:#f97316' : 'color:var(--accent)';
-        }
-        countdownHtml = `<div class="glass-sm p-4 mb-4 flex items-center gap-3">
-            <span class="material-symbols-outlined" style="font-size:28px;flex-shrink:0;${urgencyStyle}">${countdownIcon}</span>
-            <div>
-                <div style="font-size:14px;font-weight:600;${urgencyStyle}">${countdownText}</div>
-                ${examCourse ? `<div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${escapeHtml(examCourse.name)}${nextExam.creditPoints ? ' · ' + nextExam.creditPoints + ' LP' : ''}</div>` : ''}
-            </div>
+    let coursesHtml = '';
+    if (isToday && !isLectureDay) {
+        coursesHtml = `<div style="text-align:center;padding:28px 0 32px">
+            <span class="material-symbols-outlined" style="font-size:36px;color:var(--text-tertiary);display:block;margin-bottom:8px">event_busy</span>
+            <div style="font-size:14px;color:var(--text-tertiary)">Vorlesungsfrei</div>
         </div>`;
+    } else if (dayCourses.length === 0) {
+        const isWeekend = selDay >= 5;
+        coursesHtml = `<div style="text-align:center;padding:28px 0 32px">
+            <span class="material-symbols-outlined" style="font-size:36px;color:var(--text-tertiary);display:block;margin-bottom:8px">${isWeekend ? 'weekend' : 'school'}</span>
+            <div style="font-size:14px;color:var(--text-tertiary)">${isWeekend ? 'Wochenende 🎉' : 'Keine Vorlesungen'}</div>
+        </div>`;
+    } else {
+        coursesHtml = `<div class="uni-course-grid">`;
+        dayCourses.forEach(c => {
+            const slots = (c.timeSlots || []).filter(s => s.weekday === selDay);
+            const slot = slots[0] || {};
+            const timeStr = slots.length > 0
+                ? slots.map(s => `${s.startTime || ''}–${s.endTime || ''}`).join(', ')
+                : `${c.startTime || ''}–${c.endTime || ''}`;
+            const color = c.color || 'var(--accent)';
+
+            let isActiveCourse = false;
+            if (isToday && slot.startTime && slot.endTime) {
+                const [sh, sm] = slot.startTime.split(':').map(Number);
+                const [eh, em] = slot.endTime.split(':').map(Number);
+                isActiveCourse = nowMinutes >= sh * 60 + sm && nowMinutes <= eh * 60 + em;
+            }
+
+            coursesHtml += `<div class="glass-sm uni-course-card${isActiveCourse ? ' is-active' : ''}" data-course-id="${escapeAttr(c.id)}">
+                <div class="accent-bar" style="background:${escapeAttr(color)}"></div>
+                <div style="font-size:15px;font-weight:700;color:var(--text-primary);line-height:1.2;margin-bottom:6px">${escapeHtml(c.name)}</div>
+                ${c.room ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:2px">${escapeHtml(c.room)}</div>` : ''}
+                <div style="font-size:13px;color:var(--text-secondary)">${escapeHtml(timeStr)}</div>
+            </div>`;
+        });
+        coursesHtml += '</div>';
     }
 
-    let html = '';
+    // === Compact LP + GPA Card ===
+    const earnedLP = calcEarnedLP();
+    const lpProgress = earnedLP / TOTAL_LP;
+    const overallGPA = calcOverallGPA();
 
-    // === LP Progress + Stats Card ===
-    html += `<div class="glass p-5 mb-4 flex items-center gap-5">
-        <svg width="108" height="108" class="progress-ring" style="flex-shrink:0">
-            <circle class="progress-ring-bg" cx="54" cy="54" r="${lpRadius}" stroke-width="9"/>
-            <circle class="progress-ring-fill" cx="54" cy="54" r="${lpRadius}" stroke-width="9"
-                stroke-dasharray="${lpCircumference.toFixed(2)}" stroke-dashoffset="${lpOffset.toFixed(2)}"/>
-        </svg>
-        <div>
-            <div style="font-size:12px;color:var(--text-tertiary);font-weight:500;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Leistungspunkte</div>
-            <div style="font-size:36px;font-weight:700;letter-spacing:-1px">${earnedLP}<span style="font-size:20px;font-weight:400;color:var(--text-tertiary)">/${TOTAL_LP}</span></div>
-            <div style="font-size:13px;color:var(--text-secondary)">${Math.round(lpProgress * 100)}% des Studiums</div>
-            ${overallGPA != null ? `<div style="font-size:13px;color:var(--accent);margin-top:4px;font-weight:600">Ø ${overallGPA.toFixed(2)} (LP-gewichtet)</div>` : ''}
+    const statsCardHtml = `<div class="glass-sm mb-4" style="display:flex;align-items:stretch">
+        <div style="flex:1;padding:16px 20px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">LP</div>
+            <div style="font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:8px">${earnedLP}<span style="font-size:13px;font-weight:400;color:var(--text-tertiary);margin-left:2px">/180</span></div>
+            <div style="height:3px;border-radius:2px;background:var(--surface-border);overflow:hidden">
+                <div style="height:100%;border-radius:2px;background:var(--accent);width:${Math.round(lpProgress * 100)}%;transition:width 0.6s ease"></div>
+            </div>
+        </div>
+        <div style="flex:1;padding:16px 20px;border-left:1px solid rgba(255,255,255,0.08)">
+            <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Ø Note</div>
+            ${overallGPA != null
+                ? `<div style="font-size:20px;font-weight:700;color:${overallGPA <= 2.0 ? '#4ade80' : overallGPA <= 3.0 ? 'var(--accent)' : '#f87171'}">${overallGPA.toFixed(2)}</div>`
+                : `<div style="font-size:20px;font-weight:700;color:var(--text-tertiary)">–</div>`
+            }
         </div>
     </div>`;
 
-    html += countdownHtml;
+    // === Next Exams ===
+    const todayStart = startOfDay(new Date());
+    const upcomingExams = exams
+        .filter(e => { const d = toDate(e.date); return d && d >= todayStart && !e.completed; })
+        .sort((a, b) => (toDate(a.date) || new Date(9999, 0)) - (toDate(b.date) || new Date(9999, 0)))
+        .slice(0, 3);
 
-    // === Today's Courses ===
-    html += `<div class="glass-sm p-4 mb-4">
-        <div class="flex items-center gap-2 mb-3">
-            <span class="material-symbols-outlined" style="color:var(--accent)">schedule</span>
-            <span style="font-size:14px;font-weight:600">Heutige Vorlesungen</span>
-        </div>`;
-    if (todayCourses.length === 0) {
-        html += `<div style="font-size:13px;color:var(--text-tertiary)">${!isLectureDay ? 'Vorlesungsfrei / Ferien' : 'Keine Vorlesungen heute'}</div>`;
+    let examsHtml = `<div style="font-size:22px;font-weight:800;color:var(--text-primary);margin:24px 0 14px 0">Next Exams</div>`;
+    examsHtml += statsCardHtml;
+
+    if (upcomingExams.length === 0) {
+        examsHtml += `<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:14px">Keine anstehenden Klausuren</div>`;
     } else {
-        todayCourses.forEach(c => {
-            // Get today's time slot
-            const slots = c.timeSlots || [];
-            const todaySlots = slots.filter(s => s.weekday === dayOfWeek);
-            const timeStr = todaySlots.length > 0
-                ? todaySlots.map(s => `${s.startTime}–${s.endTime}`).join(', ')
-                : `${c.startTime}–${c.endTime}`;
+        upcomingExams.forEach(e => {
+            const examDate = startOfDay(toDate(e.date));
+            const daysUntil = Math.ceil((examDate.getTime() - todayStart.getTime()) / 86400000);
+            const course = courses.find(c => c.id === e.courseId);
 
-            html += `<div class="flex items-center gap-3 py-2" style="border-bottom:1px solid var(--surface-border)">
-                <div style="width:4px;height:32px;border-radius:2px;background:${c.color || '#3742fa'}"></div>
-                <div class="flex-1">
-                    <div style="font-size:14px;font-weight:500">${escapeHtml(c.name)}</div>
-                    <div style="font-size:12px;color:var(--text-tertiary)">${timeStr} · ${escapeHtml(c.room || '')}</div>
+            const progress = daysUntil <= 30 ? 1 - (daysUntil / 30) : 0.05;
+            const dashLen = (progress * 213.6).toFixed(1);
+
+            let ringStroke, ringFilterStyle, centerSvg;
+            if (daysUntil <= 7) {
+                ringStroke = '#ff6b00';
+                ringFilterStyle = 'filter:drop-shadow(0 0 8px rgba(255,107,0,0.7))';
+                centerSvg = `<g transform="rotate(90 40 40)">
+                    <text x="40" y="34" text-anchor="middle" dominant-baseline="middle"
+                        style="font-size:22px;font-weight:800;fill:#ff6b00">${daysUntil}</text>
+                    <text x="40" y="52" text-anchor="middle" dominant-baseline="middle"
+                        style="font-size:11px;fill:white;opacity:0.7">days</text>
+                </g>`;
+            } else if (daysUntil <= 14) {
+                ringStroke = 'var(--accent)';
+                ringFilterStyle = 'filter:drop-shadow(0 0 6px rgba(245,158,11,0.5))';
+                centerSvg = `<g transform="rotate(90 40 40)">
+                    <text x="40" y="34" text-anchor="middle" dominant-baseline="middle"
+                        style="font-size:22px;font-weight:800;fill:var(--accent)">${daysUntil}</text>
+                    <text x="40" y="52" text-anchor="middle" dominant-baseline="middle"
+                        style="font-size:11px;fill:white;opacity:0.7">days</text>
+                </g>`;
+            } else {
+                ringStroke = 'rgba(255,255,255,0.2)';
+                ringFilterStyle = '';
+                const dateStr = `${examDate.getDate()}. ${MONTHS_SHORT[examDate.getMonth()]}`;
+                centerSvg = `<g transform="rotate(90 40 40)">
+                    <text x="40" y="40" text-anchor="middle" dominant-baseline="middle"
+                        style="font-size:12px;font-weight:600;fill:var(--text-secondary)">${escapeHtml(dateStr)}</text>
+                </g>`;
+            }
+
+            const relStr = daysUntil === 0 ? 'Heute' : daysUntil === 1 ? 'Morgen' : `in ${daysUntil} Tagen`;
+            const dateRelStr = `${examDate.getDate()}. ${MONTHS_SHORT[examDate.getMonth()]}, ${relStr}`;
+
+            examsHtml += `<div class="glass-sm" style="border-radius:18px;padding:18px;margin-bottom:12px;display:flex;align-items:center;gap:16px">
+                <div class="uni-exam-ring-wrap" style="${ringFilterStyle}">
+                    <svg width="80" height="80" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="6"/>
+                        <circle cx="40" cy="40" r="34" fill="none" stroke="${ringStroke}" stroke-width="6"
+                            stroke-dasharray="${dashLen} 213.6" stroke-dashoffset="0"
+                            stroke-linecap="round"/>
+                        ${centerSvg}
+                    </svg>
                 </div>
-                ${c.creditHours ? `<span style="font-size:11px;color:var(--text-tertiary)">${c.creditHours} LP</span>` : ''}
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(e.title || course?.name || 'Klausur')}</div>
+                    <div style="font-size:14px;color:var(--accent);font-weight:500;margin-bottom:4px">${escapeHtml(dateRelStr)}</div>
+                    ${e.room ? `<div style="font-size:13px;color:var(--text-secondary)">${escapeHtml(e.room)}</div>` : ''}
+                </div>
             </div>`;
         });
     }
-    html += '</div>';
 
-    // === Active / Completed Course List ===
-    if (courses.length === 0) {
-        html += `<div class="empty-state">
-            <span class="material-symbols-outlined">school</span>
-            <div class="empty-state-text">Lege Kurse an, um zu starten</div>
-        </div>`;
-        content.innerHTML = html;
-        return;
-    }
-
+    // === Full Course List (expandable) ===
     const activeCourses = courses.filter(c => !isCourseCompleted(c));
     const completedCourses = courses.filter(c => isCourseCompleted(c));
-
-    if (activeCourses.length > 0) {
-        html += `<div style="font-size:13px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">
-            🔵 Aktive Kurse (${activeCourses.length})
+    let allCoursesHtml = '';
+    if (courses.length === 0) {
+        allCoursesHtml = `<div class="empty-state" style="animation:fadeInUp 0.45s cubic-bezier(0.22,1,0.36,1) both 0.1s">
+            <span class="material-symbols-outlined" style="font-size:48px;color:var(--accent)">school</span>
+            <div class="empty-state-text">Lege Kurse an, um zu starten</div>
         </div>`;
-        activeCourses.forEach(c => { html += renderCourseCard(c); });
+    } else {
+        allCoursesHtml = `<div style="font-size:22px;font-weight:800;color:var(--text-primary);margin:24px 0 14px 0">Alle Kurse</div>`;
+        activeCourses.forEach(c => { allCoursesHtml += renderCourseCard(c); });
+        if (completedCourses.length > 0) {
+            allCoursesHtml += `<div class="uni-section-subheader">✓ Abgeschlossen (${completedCourses.length})</div>`;
+            completedCourses.forEach(c => { allCoursesHtml += renderCourseCard(c, true); });
+        }
     }
 
-    if (completedCourses.length > 0) {
-        html += `<div style="font-size:13px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px">
-            🟢 Abgeschlossene Kurse (${completedCourses.length})
-        </div>`;
-        completedCourses.forEach(c => { html += renderCourseCard(c, true); });
-    }
+    content.innerHTML = weekHtml + coursesHtml + examsHtml + allCoursesHtml;
 
-    content.innerHTML = html;
+    // Wire week strip buttons
+    content.querySelectorAll('.uni-day-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedWeekday = parseInt(btn.dataset.day);
+            render();
+        });
+    });
+
     wireExpandCards(content);
 }
 

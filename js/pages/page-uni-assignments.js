@@ -14,7 +14,7 @@ export function initPageUniAssignments() {
 
     container.innerHTML = `
         <div class="page-header">
-            <span class="page-header-title">Aufgaben</span>
+            <span class="page-header-title page-title">Aufgaben</span>
             <div class="page-header-actions">
                 <button class="icon-btn" id="assignments-add-btn">
                     <span class="material-symbols-outlined">add</span>
