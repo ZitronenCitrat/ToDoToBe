@@ -159,9 +159,20 @@ function getTodayProgress() {
     const inboxDone = inboxId
         ? appState.allTodos.filter(t => t.listId === inboxId && t.completed && !t.dueDate && !t.recurrence)
         : [];
+
+    // Habits due today (daily + matching weekday)
+    const todayDayOfWeek = new Date().getDay();
+    const today = todayDateStr();
+    const habitsDueToday = (appState.allHabits || []).filter(h =>
+        !h.archived && (h.frequency === 'daily' || (h.frequency === 'weekly' && h.weekday === todayDayOfWeek))
+    );
+    const habitsDoneCount = habitsDueToday.filter(h =>
+        (appState.habitLogs || []).some(l => l.habitId === h.id && l.date === today && l.completed)
+    ).length;
+
     return {
-        done: todayDone.length + inboxDone.length,
-        total: todayActive.length + todayDone.length + inboxActive.length + inboxDone.length
+        done: todayDone.length + inboxDone.length + habitsDoneCount,
+        total: todayActive.length + todayDone.length + inboxActive.length + inboxDone.length + habitsDueToday.length
     };
 }
 

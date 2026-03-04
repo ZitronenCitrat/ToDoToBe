@@ -692,6 +692,7 @@ export async function addEvent(data) {
         color: data.color || null,
         ...(data.courseId ? { courseId: data.courseId } : {}),
         ...(data.examId ? { examId: data.examId } : {}),
+        ...(data.extraEventName ? { extraEventName: data.extraEventName } : {}),
         createdAt: Timestamp.now()
     });
     gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, endTime: data.endTime, category: data.category });

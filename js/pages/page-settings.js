@@ -110,6 +110,8 @@ export function initPageSettings() {
                 <span class="material-symbols-outlined" style="font-size:20px">person_remove</span>
                 Konto löschen
             </button>
+
+            <p style="font-size:12px;color:var(--text-tertiary);text-align:center;margin-top:24px;margin-bottom:8px">ToDoToBe v1.0</p>
         </div>
     `;
 

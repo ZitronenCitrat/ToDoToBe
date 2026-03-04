@@ -91,11 +91,6 @@ function handleRoute() {
         fab.classList.add('hidden');
     }
 
-    // Update active tab highlight
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.route === routeKey);
-    });
-
     // Notify listeners
     onRouteChangeCallbacks.forEach(fn => fn(routeKey, params));
 }

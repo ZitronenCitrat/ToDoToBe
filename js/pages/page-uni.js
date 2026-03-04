@@ -152,6 +152,7 @@ async function generateCourseCalendarEvents(course) {
                 ].join('-');
                 const alreadyExists = appState.allEvents.some(ev => {
                     if (ev.courseId !== course.id || ev.time !== slot.startTime) return false;
+                    if (ev.extraEventName) return false; // Skip Übung events
                     if (!ev.date) return false;
                     const evStr = ev.date.toDate
                         ? ev.date.toDate().toISOString().split('T')[0]
@@ -174,10 +175,58 @@ async function generateCourseCalendarEvents(course) {
             current.setDate(current.getDate() + 7);
         }
     }
+
+    // Generate calendar events for additional events (Übungen, Tutorien, etc.)
+    for (const extraEvent of (course.additionalEvents || [])) {
+        for (const slot of (extraEvent.timeSlots || [])) {
+            let current = getFirstOccurrence(lectureStart, slot.weekday);
+            while (current <= lectureEnd) {
+                if (!isHolidayDate(current)) {
+                    const dateStr = [
+                        current.getFullYear(),
+                        String(current.getMonth() + 1).padStart(2, '0'),
+                        String(current.getDate()).padStart(2, '0')
+                    ].join('-');
+                    const alreadyExists = appState.allEvents.some(ev => {
+                        if (ev.courseId !== course.id || ev.time !== slot.startTime) return false;
+                        if ((ev.extraEventName || null) !== extraEvent.name) return false;
+                        if (!ev.date) return false;
+                        const evStr = ev.date.toDate
+                            ? ev.date.toDate().toISOString().split('T')[0]
+                            : String(ev.date).split('T')[0];
+                        return evStr === dateStr;
+                    });
+                    if (!alreadyExists) {
+                        await addEvent({
+                            title: extraEvent.name,
+                            date: dateStr,
+                            time: slot.startTime,
+                            endTime: slot.endTime,
+                            category: 'Uni',
+                            recurrence: null,
+                            courseId: course.id,
+                            extraEventName: extraEvent.name
+                        });
+                    }
+                }
+                current = new Date(current);
+                current.setDate(current.getDate() + 7);
+            }
+        }
+    }
 }
 
 async function deleteCalendarEventsForCourse(courseId) {
     const toDelete = (appState.allEvents || []).filter(ev => ev.courseId === courseId);
+    for (const ev of toDelete) {
+        await deleteEvent(ev.id);
+    }
+}
+
+async function deleteCalendarEventsForExtra(courseId, extraEventName) {
+    const toDelete = (appState.allEvents || []).filter(ev =>
+        ev.courseId === courseId && ev.extraEventName === extraEventName
+    );
     for (const ev of toDelete) {
         await deleteEvent(ev.id);
     }
@@ -598,7 +647,10 @@ function wireExpandCards(content) {
             const course = appState.allCourses.find(c => c.id === btn.dataset.courseId);
             if (!course) return;
             const events = [...(course.additionalEvents || [])];
-            events.splice(parseInt(btn.dataset.idx), 1);
+            const deleted = events.splice(parseInt(btn.dataset.idx), 1)[0];
+            if (deleted?.name) {
+                await deleteCalendarEventsForExtra(btn.dataset.courseId, deleted.name);
+            }
             await updateCourse(btn.dataset.courseId, { additionalEvents: events });
         });
     });
@@ -939,13 +991,28 @@ function openAddExtraModal(courseId) {
         if (!name) return;
         const course = appState.allCourses.find(c => c.id === courseId);
         if (!course) return;
-        const additionalEvents = [...(course.additionalEvents || []), {
+
+        // Prevent duplicate names (extraEventName is used as an identifier for GCal events)
+        const existingExtras = course.additionalEvents || [];
+        if (existingExtras.some(ev => ev.name === name)) {
+            alert('Eine Übung mit diesem Namen existiert bereits.');
+            return;
+        }
+
+        const saveBtn = modal.querySelector('#ex-save');
+        saveBtn.disabled = true;
+
+        const newExtra = {
             name,
             type: modal.querySelector('#ex-type').value,
             room: modal.querySelector('#ex-room').value.trim(),
             timeSlots: localSlots
-        }];
+        };
+        const additionalEvents = [...existingExtras, newExtra];
         await updateCourse(courseId, { additionalEvents });
+        // Generate calendar events for the new Übung
+        const updatedCourse = { ...course, additionalEvents };
+        await generateCourseCalendarEvents(updatedCourse);
         modal.remove();
     });
 
