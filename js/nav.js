@@ -23,13 +23,11 @@ function renderNav() {
     const nav = document.getElementById('bottom-nav');
     if (!nav) return;
 
-    const activeMode = appState.activeMode || 'home';
-
     nav.innerHTML = '';
 
     MODE_TABS.forEach(item => {
         const btn = document.createElement('button');
-        const isActive = item.mode === activeMode;
+        const isActive = appState.activeMode === item.mode;
         btn.className = 'nav-tab' + (isActive ? ' active' : '');
         btn.dataset.mode = item.mode;
 
@@ -42,22 +40,20 @@ function renderNav() {
                 </div>
                 ${item.badgeId ? `<span class="nav-tab-badge" id="${item.badgeId}"></span>` : ''}
             `;
-        } else if (isActive) {
-            // Active non-uni tab: icon + label
+        } else {
+            // Active and inactive non-uni tabs: always render label (CSS hides it when inactive)
             btn.innerHTML = `
                 <span class="material-symbols-outlined">${item.icon}</span>
                 <span class="nav-tab-label">${item.label}</span>
                 ${item.badgeId ? `<span class="nav-tab-badge" id="${item.badgeId}"></span>` : ''}
             `;
-        } else {
-            // Inactive tab: icon only
-            btn.innerHTML = `
-                <span class="material-symbols-outlined">${item.icon}</span>
-                ${item.badgeId ? `<span class="nav-tab-badge" id="${item.badgeId}"></span>` : ''}
-            `;
         }
 
-        btn.addEventListener('click', () => setMode(item.mode));
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            setMode(item.mode);
+        });
         nav.appendChild(btn);
     });
 

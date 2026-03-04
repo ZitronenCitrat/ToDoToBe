@@ -15,7 +15,7 @@ export function initPageProjectDetail() {
 
     container.innerHTML = `
         <div class="page-header">
-            <button class="icon-btn" id="project-back-btn">
+            <button class="icon-btn" id="project-detail-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
             <div class="page-header-actions">
@@ -40,7 +40,7 @@ export function initPageProjectDetail() {
     `;
 
     // Back
-    container.querySelector('#project-back-btn').addEventListener('click', back);
+    container.querySelector('#project-detail-back-btn').addEventListener('click', () => navigate('projects'));
 
     // Edit name
     container.querySelector('#project-edit-btn').addEventListener('click', async () => {

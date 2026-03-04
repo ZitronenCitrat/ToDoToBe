@@ -13,6 +13,9 @@ export function initPageStats() {
 
     container.innerHTML = `
         <div class="page-header">
+            <button class="icon-btn" id="stats-back-btn">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
             <h1 class="page-header-title page-title">Statistiken</h1>
         </div>
         <div class="px-5 flex-1">
@@ -26,6 +29,8 @@ export function initPageStats() {
             <div id="stats-breakdown" class="glass p-4 mb-4"></div>
         </div>
     `;
+
+    document.getElementById('stats-back-btn').addEventListener('click', () => history.back());
 
     // Filter buttons
     container.querySelectorAll('#stats-filters .tab-btn').forEach(btn => {

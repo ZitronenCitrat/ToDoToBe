@@ -14,6 +14,9 @@ let currentUserId = null;  // set by initGcal(userId, ...)
 let gcalIdsCache  = {};    // in-memory cache of entityKey → gcalEventId
 let gcalTokenLoaded = false;
 let wasConnected = false;  // true if Firestore shows the user previously connected
+let refreshResolve = null; // pending refreshTokenSilent() resolve
+let refreshReject  = null; // pending refreshTokenSilent() reject
+let focusListenerAdded = false;
 
 // ===== Init =====
 
@@ -51,8 +54,30 @@ export async function initGcal(userId, onStatusChange) {
         } catch (e) {
             console.warn('[gcal] Could not restore token from Firestore:', e);
         }
+        // FIX 4: Token from Firestore is expired — try silent refresh
+        if (wasConnected && !isGcalConnected()) {
+            try {
+                await refreshTokenSilent();
+            } catch (e) {
+                showGcalReconnectBanner();
+            }
+        }
+
         // Notify whoever registered a callback by the time the load finishes
         onConnectCb?.(isGcalConnected());
+
+        // FIX 2: Re-validate token each time the app regains focus
+        if (!focusListenerAdded) {
+            focusListenerAdded = true;
+            window.addEventListener('focus', () => {
+                if (wasConnected && !isGcalConnected()) {
+                    refreshTokenSilent().catch(() => {
+                        onConnectCb?.(false);
+                        showGcalReconnectBanner();
+                    });
+                }
+            });
+        }
     } else if (onStatusChange !== undefined) {
         // Token already loaded — notify the newly registered callback immediately
         onConnectCb?.(isGcalConnected());
@@ -78,6 +103,8 @@ async function _handleTokenResponse(response) {
     if (response.error) {
         console.error('[gcal] Auth error:', response.error);
         onConnectCb?.(false);
+        refreshReject?.(new Error(response.error));
+        refreshResolve = null; refreshReject = null;
         return;
     }
     accessToken = response.access_token;
@@ -100,8 +127,16 @@ async function _handleTokenResponse(response) {
     }
 
     onConnectCb?.(true);
+    refreshResolve?.();
+    refreshResolve = null; refreshReject = null;
 
-    // Sync all existing data on first connect
+    // FIX 1: Schedule a silent refresh 5 minutes before expiry
+    const timeUntilExpiry = tokenExpiry - Date.now() - 300_000;
+    if (timeUntilExpiry > 0) {
+        setTimeout(() => refreshTokenSilent(), timeUntilExpiry);
+    }
+
+    // FIX 3: Always sync on token grant — verifyAndSyncEntity prevents duplicates
     import('./app.js').then(({ appState }) => syncAllToGcal(appState)).catch(() => {});
 }
 
@@ -122,6 +157,37 @@ export function connectGcal() {
         return;
     }
     client.requestAccessToken({ prompt: 'consent' });
+}
+
+export function showGcalReconnectBanner() {
+    document.getElementById('gcal-reconnect-banner')?.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'gcal-reconnect-banner';
+    banner.style.cssText = `
+        position:fixed;bottom:80px;left:16px;right:16px;
+        background:rgba(245,158,11,0.15);
+        border:1px solid rgba(245,158,11,0.4);
+        border-radius:14px;padding:12px 16px;
+        display:flex;align-items:center;justify-content:space-between;
+        z-index:9999;backdrop-filter:blur(12px);
+    `;
+
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:14px;color:var(--text-primary)';
+    label.textContent = 'Google Kalender getrennt';
+
+    const btn = document.createElement('button');
+    btn.style.cssText = 'font-size:13px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer';
+    btn.textContent = 'Neu verbinden';
+    btn.addEventListener('click', () => {
+        banner.remove();
+        connectGcal();
+    });
+
+    banner.appendChild(label);
+    banner.appendChild(btn);
+    document.body.appendChild(banner);
 }
 
 export async function disconnectGcal() {
@@ -150,13 +216,17 @@ export async function disconnectGcal() {
     onConnectCb?.(false);
 }
 
-/** Refresh an expired token silently (no prompt). */
+/** Refresh an expired token silently (no prompt). Returns a Promise. */
 export function refreshTokenSilent() {
-    if (isGcalConnected()) return;
-    if (!wasConnected) return;
-    const client = getTokenClient();
-    if (!client) return;
-    client.requestAccessToken({ prompt: '' });
+    return new Promise((resolve, reject) => {
+        if (isGcalConnected()) { resolve(); return; }
+        if (!wasConnected) { reject(new Error('Not previously connected')); return; }
+        const client = getTokenClient();
+        if (!client) { reject(new Error('No token client available')); return; }
+        refreshResolve = resolve;
+        refreshReject  = reject;
+        client.requestAccessToken({ prompt: '' });
+    });
 }
 
 // ===== gcal-id mapping (in-memory + Firestore) =====
@@ -363,8 +433,36 @@ export async function syncEntityToGcal(type, entity, meta = {}) {
 }
 
 /**
+ * Used by syncAllToGcal: skip if already synced (FIX 1), verify GCal event still exists (FIX 2).
+ * Leaves syncEntityToGcal's PATCH behavior intact for individual updates from db.js.
+ */
+async function verifyAndSyncEntity(type, entity, meta = {}) {
+    if (!entity?.id) return;
+    const key = `${type}-${entity.id}`;
+    const existingGcalId = gcalIdsCache[key];
+
+    if (existingGcalId) {
+        // FIX 2: Verify the event still exists in Google Calendar
+        try {
+            const res = await fetch(
+                `${GCAL_API_BASE}/calendars/primary/events/${existingGcalId}`,
+                { headers: { 'Authorization': `Bearer ${accessToken}` } }
+            );
+            if (res.ok) return; // FIX 1: Already synced and event exists — skip
+            // Event was deleted from Google Calendar — remove stale cache entry and recreate
+            delete gcalIdsCache[key];
+        } catch (e) {
+            return; // Network error — skip to be safe
+        }
+    }
+
+    await syncEntityToGcal(type, entity, meta);
+}
+
+/**
  * Sync all current app state to Google Calendar.
- * Called once after connecting (to push existing data).
+ * FIX 3: Always safe to call — FIX 1/2 prevent duplicate creation.
+ * FIX 4: Saves updated gcalIdsCache to Firestore after completion.
  */
 export async function syncAllToGcal(appState) {
     if (!isGcalConnected() || !appState) return;
@@ -375,19 +473,19 @@ export async function syncAllToGcal(appState) {
     // Todos with due dates (not completed)
     appState.allTodos
         .filter(t => t.dueDate && !t.completed)
-        .forEach(t => tasks.push(syncEntityToGcal('todo', t)));
+        .forEach(t => tasks.push(verifyAndSyncEntity('todo', t)));
 
     // Events (Termine)
     appState.allEvents
         .filter(ev => ev.date)
-        .forEach(ev => tasks.push(syncEntityToGcal('event', ev)));
+        .forEach(ev => tasks.push(verifyAndSyncEntity('event', ev)));
 
     // Exams with dates
     appState.allExams
         .filter(e => e.date)
         .forEach(e => {
             const course = appState.allCourses.find(c => c.id === e.courseId);
-            tasks.push(syncEntityToGcal('exam', e, { courseName: course?.name || '' }));
+            tasks.push(verifyAndSyncEntity('exam', e, { courseName: course?.name || '' }));
         });
 
     // Assignments with due dates (not completed)
@@ -395,13 +493,13 @@ export async function syncAllToGcal(appState) {
         .filter(a => a.dueDate && !a.completed)
         .forEach(a => {
             const course = appState.allCourses.find(c => c.id === a.courseId);
-            tasks.push(syncEntityToGcal('assignment', a, { courseName: course?.name || '' }));
+            tasks.push(verifyAndSyncEntity('assignment', a, { courseName: course?.name || '' }));
         });
 
     // Wishes with dates (not purchased)
     appState.allWishlistItems
         .filter(w => w.date && !w.purchased)
-        .forEach(w => tasks.push(syncEntityToGcal('wish', w)));
+        .forEach(w => tasks.push(verifyAndSyncEntity('wish', w)));
 
     // Execute in small batches to avoid rate limiting
     const BATCH_SIZE = 5;
@@ -409,6 +507,18 @@ export async function syncAllToGcal(appState) {
         await Promise.allSettled(tasks.slice(i, i + BATCH_SIZE));
         if (i + BATCH_SIZE < tasks.length) {
             await new Promise(r => setTimeout(r, 200)); // 200ms pause between batches
+        }
+    }
+
+    // FIX 4: Persist updated gcalIdsCache (new entries + cleared stale entries) to Firestore
+    if (currentUserId) {
+        try {
+            const { db } = await import('./app.js');
+            const { updateDoc, doc: fsDoc } =
+                await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
+            await updateDoc(fsDoc(db, 'users', currentUserId), { gcalIds: gcalIdsCache });
+        } catch (e) {
+            console.warn('[gcal] Could not save gcalIds to Firestore:', e);
         }
     }
 }

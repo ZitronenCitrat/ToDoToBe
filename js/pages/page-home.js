@@ -19,11 +19,6 @@ export function initPageHome() {
             <button class="icon-btn" id="home-settings-btn">
                 <span class="material-symbols-outlined">settings</span>
             </button>
-            <div class="page-header-actions">
-                <button class="avatar-btn" id="home-avatar-btn">
-                    <img src="" alt="" id="home-avatar-img">
-                </button>
-            </div>
         </div>
         <div class="px-5 pb-3">
             <h1 id="home-greeting" class="page-title">Guten Morgen</h1>
@@ -33,7 +28,6 @@ export function initPageHome() {
     `;
 
     container.querySelector('#home-settings-btn').addEventListener('click', () => navigate('settings'));
-    container.querySelector('#home-avatar-btn').addEventListener('click', () => navigate('settings'));
 
     registerFabAction('home', openQuickAdd);
 
@@ -64,15 +58,6 @@ function renderHome() {
             greetText += `, ${appState.user.displayName.split(' ')[0]}`;
         }
         greeting.textContent = greetText;
-    }
-
-    // Avatar
-    if (appState.user) {
-        const img = container.querySelector('#home-avatar-img');
-        if (img) {
-            img.src = appState.user.photoURL || '';
-            img.alt = appState.user.displayName || '';
-        }
     }
 
     const content = container.querySelector('#home-content');
@@ -478,9 +463,8 @@ function buildWishesHtml() {
 
     return `
     <div class="glass-sm mb-4">
-        <div style="padding:12px 16px 8px;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:0.08em;text-transform:uppercase">Wünsche</span>
-            <button id="home-wishes-all-btn" class="btn-ghost" style="font-size:12px;padding:4px 10px">Alle</button>
+        <div style="padding:12px 16px 8px">
+            <button class="section-header-link" id="home-wishes-all-btn">Wünsche<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle">chevron_right</span></button>
         </div>
         ${rows}
     </div>`;

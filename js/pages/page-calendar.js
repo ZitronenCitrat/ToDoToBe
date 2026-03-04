@@ -6,7 +6,7 @@ import {
     getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
     getActiveSemester, isTodayLectureDay, toInputDate, isTodoActiveOnDate
 } from '../utils.js';
-import { addEvent, updateEvent, deleteEvent } from '../db.js';
+import { addEvent, updateEvent, deleteEvent, addCalendarCategory, deleteCalendarCategory } from '../db.js';
 
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
@@ -24,6 +24,9 @@ export function initPageCalendar() {
         <div class="page-header">
             <h1 class="page-header-title page-title">Kalender</h1>
             <div class="page-header-actions">
+                <button class="icon-btn" id="cal-categories-btn" title="Kategorien verwalten">
+                    <span class="material-symbols-outlined">category</span>
+                </button>
                 <button class="icon-btn" id="cal-today-btn" title="Heute">
                     <span class="material-symbols-outlined">today</span>
                 </button>
@@ -77,6 +80,7 @@ export function initPageCalendar() {
         if (currentMonth > 11) { currentMonth = 0; currentYear++; }
         renderCalendar();
     });
+    container.querySelector('#cal-categories-btn').addEventListener('click', () => openManageCategoriesModal());
     container.querySelector('#cal-today-btn').addEventListener('click', () => {
         currentYear = new Date().getFullYear();
         currentMonth = new Date().getMonth();
@@ -487,8 +491,6 @@ function renderDayItems() {
 
 // ----- Add / Edit Event Modal -----
 
-const EVENT_CATEGORIES = ['Uni', 'Wünsche', 'Todos', 'Persönlich', 'Arbeit', 'Sonstiges'];
-
 function openAddEventModal(defaultDate, existing = null, defaultCategory = null) {
     const old = document.getElementById('event-modal');
     if (old) old.remove();
@@ -528,7 +530,7 @@ function openAddEventModal(defaultDate, existing = null, defaultCategory = null)
             <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Kategorie</div>
             <select id="event-category" class="glass-select w-full mb-3">
                 <option value="" ${selectedCat === '' ? 'selected' : ''}>Keine Kategorie</option>
-                ${EVENT_CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${selectedCat === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+                ${appState.calendarCategories.map(c => `<option value="${escapeAttr(c.name)}" ${selectedCat === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
             </select>
             <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">Wiederholung</div>
             <select id="event-recurrence" class="glass-select w-full mb-4">
@@ -578,4 +580,73 @@ function openAddEventModal(defaultDate, existing = null, defaultCategory = null)
     }
 
     setTimeout(() => modal.querySelector('#event-title').focus(), 100);
+}
+
+// ----- Category Management Modal -----
+
+function openManageCategoriesModal() {
+    const old = document.getElementById('cat-manage-modal');
+    if (old) old.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'cat-manage-modal';
+    modal.className = 'modal-overlay';
+
+    modal.innerHTML = `
+        <div class="modal-backdrop"></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <h2 class="text-lg font-semibold mb-4">Kategorien verwalten</h2>
+            <div id="cat-manage-list"></div>
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08)">
+                <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">Neue Kategorie</div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="text" id="cat-new-name" class="glass-input" style="flex:1" placeholder="Name">
+                    <input type="color" id="cat-new-color" value="#6b7280" title="Farbe wählen"
+                        style="width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);cursor:pointer;background:rgba(255,255,255,0.08);padding:2px;flex-shrink:0">
+                    <button id="cat-new-add" class="btn-accent" style="padding:0 16px;height:40px;flex-shrink:0">+</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    function renderCatList() {
+        const list = modal.querySelector('#cat-manage-list');
+        if (!list) return;
+        list.innerHTML = '';
+        appState.calendarCategories.forEach(cat => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)';
+            row.innerHTML = `
+                <div style="width:14px;height:14px;border-radius:50%;background:${cat.color};flex-shrink:0"></div>
+                <span style="flex:1;font-size:14px">${escapeHtml(cat.name)}</span>
+                <button data-id="${escapeAttr(cat.id)}" class="cat-delete-btn icon-btn" style="width:28px;height:28px">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#ef4444">delete</span>
+                </button>
+            `;
+            list.appendChild(row);
+        });
+        list.querySelectorAll('.cat-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteCalendarCategory(btn.dataset.id));
+        });
+    }
+
+    renderCatList();
+    const unsub = onStateChange(() => renderCatList());
+
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => { unsub(); modal.remove(); });
+
+    modal.querySelector('#cat-new-add').addEventListener('click', async () => {
+        const nameInput = modal.querySelector('#cat-new-name');
+        const name = nameInput.value.trim();
+        if (!name) return;
+        const color = modal.querySelector('#cat-new-color').value;
+        await addCalendarCategory({ name, color, sortOrder: appState.calendarCategories.length });
+        nameInput.value = '';
+    });
+
+    modal.querySelector('#cat-new-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') modal.querySelector('#cat-new-add').click();
+    });
 }

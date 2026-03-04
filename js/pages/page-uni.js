@@ -6,7 +6,8 @@ import {
 } from '../utils.js';
 import {
     updateCourse, deleteCourse, updateExam, deleteExam,
-    addExam, updateAssignment, deleteAssignment, addAssignment
+    addExam, updateAssignment, deleteAssignment, addAssignment,
+    addEvent, deleteEvent
 } from '../db.js';
 
 const TOTAL_LP = 180;
@@ -37,11 +38,6 @@ export function initPageUni() {
             <button class="icon-btn" id="uni-settings-btn">
                 <span class="material-symbols-outlined">settings</span>
             </button>
-            <div class="page-header-actions">
-                <button class="avatar-btn" id="uni-avatar-btn">
-                    <img src="" alt="" id="uni-avatar-img">
-                </button>
-            </div>
         </div>
 
         <div class="px-5 pb-1" style="position:relative;z-index:1">
@@ -66,7 +62,6 @@ export function initPageUni() {
     `;
 
     container.querySelector('#uni-settings-btn').addEventListener('click', () => navigate('uni-settings'));
-    container.querySelector('#uni-avatar-btn').addEventListener('click', () => navigate('uni-settings'));
     container.querySelector('#uni-timetable-btn').addEventListener('click', () => navigate('timetable'));
     container.querySelector('#uni-assignments-btn').addEventListener('click', () => navigate('assignments'));
     container.querySelector('#uni-grades-btn').addEventListener('click', () => navigate('grades'));
@@ -116,6 +111,78 @@ function calcOverallGPA() {
     return totalLP > 0 ? weightedSum / totalLP : null;
 }
 
+// ===== Calendar Event Sync Helpers =====
+
+async function generateCourseCalendarEvents(course) {
+    const activeSemester = getActiveSemester(appState.allSemesters || []);
+    if (!activeSemester) return;
+
+    const lectureStart = activeSemester.lectureStart.toDate
+        ? activeSemester.lectureStart.toDate()
+        : new Date(activeSemester.lectureStart);
+    const lectureEnd = activeSemester.lectureEnd.toDate
+        ? activeSemester.lectureEnd.toDate()
+        : new Date(activeSemester.lectureEnd);
+    const holidays = activeSemester.holidays || [];
+
+    function isHolidayDate(date) {
+        return holidays.some(h => {
+            const hStart = h.start.toDate ? h.start.toDate() : new Date(h.start);
+            const hEnd = h.end.toDate ? h.end.toDate() : new Date(h.end);
+            return date >= hStart && date <= hEnd;
+        });
+    }
+
+    // weekday: 0=Monday, 6=Sunday → JS getDay() 0=Sunday
+    function getFirstOccurrence(startDate, weekday) {
+        const d = new Date(startDate);
+        const jsWeekday = weekday === 6 ? 0 : weekday + 1;
+        while (d.getDay() !== jsWeekday) d.setDate(d.getDate() + 1);
+        return d;
+    }
+
+    for (const slot of (course.timeSlots || [])) {
+        let current = getFirstOccurrence(lectureStart, slot.weekday);
+        while (current <= lectureEnd) {
+            if (!isHolidayDate(current)) {
+                const dateStr = [
+                    current.getFullYear(),
+                    String(current.getMonth() + 1).padStart(2, '0'),
+                    String(current.getDate()).padStart(2, '0')
+                ].join('-');
+                const alreadyExists = appState.allEvents.some(ev => {
+                    if (ev.courseId !== course.id || ev.time !== slot.startTime) return false;
+                    if (!ev.date) return false;
+                    const evStr = ev.date.toDate
+                        ? ev.date.toDate().toISOString().split('T')[0]
+                        : String(ev.date).split('T')[0];
+                    return evStr === dateStr;
+                });
+                if (!alreadyExists) {
+                    await addEvent({
+                        title: course.name,
+                        date: dateStr,
+                        time: slot.startTime,
+                        endTime: slot.endTime,
+                        category: 'Uni',
+                        recurrence: null,
+                        courseId: course.id
+                    });
+                }
+            }
+            current = new Date(current);
+            current.setDate(current.getDate() + 7);
+        }
+    }
+}
+
+async function deleteCalendarEventsForCourse(courseId) {
+    const toDelete = (appState.allEvents || []).filter(ev => ev.courseId === courseId);
+    for (const ev of toDelete) {
+        await deleteEvent(ev.id);
+    }
+}
+
 /** A course is "completed" if it has at least one passed exam (grade ≤ 4.0) */
 function isCourseCompleted(course) {
     return appState.allExams.some(e => e.courseId === course.id && e.grade != null && e.grade <= 4.0);
@@ -124,11 +191,6 @@ function isCourseCompleted(course) {
 function render() {
     const content = document.querySelector('#uni-content');
     if (!content) return;
-
-    if (appState.user) {
-        const img = document.querySelector('#uni-avatar-img');
-        if (img) { img.src = appState.user.photoURL || ''; img.alt = appState.user.displayName || ''; }
-    }
 
     const courses = appState.allCourses;
     const exams = appState.allExams;
@@ -157,8 +219,17 @@ function render() {
     }
     weekHtml += '</div>';
 
+    // Actual Date object for the selected day in the strip
+    const selectedDate = startOfDay(new Date(weekStart));
+    selectedDate.setDate(weekStart.getDate() + selDay);
+    const selectedDateStr = [
+        selectedDate.getFullYear(),
+        String(selectedDate.getMonth() + 1).padStart(2, '0'),
+        String(selectedDate.getDate()).padStart(2, '0')
+    ].join('-');
+
     // === Courses for selected day ===
-    const isLectureDay = selDay === todayIdx ? isTodayLectureDay(activeSemester) : true;
+    const isLectureDay = isTodayLectureDay(activeSemester, selectedDate);
     const dayCourses = courses
         .filter(c => {
             const slots = c.timeSlots || [];
@@ -175,7 +246,7 @@ function render() {
     const isToday = selDay === todayIdx;
 
     let coursesHtml = '';
-    if (isToday && !isLectureDay) {
+    if (!isLectureDay) {
         coursesHtml = `<div style="text-align:center;padding:28px 0 32px">
             <span class="material-symbols-outlined" style="font-size:36px;color:var(--text-tertiary);display:block;margin-bottom:8px">event_busy</span>
             <div style="font-size:14px;color:var(--text-tertiary)">Vorlesungsfrei</div>
@@ -211,6 +282,33 @@ function render() {
             </div>`;
         });
         coursesHtml += '</div>';
+    }
+
+    // === Exams for selected day ===
+    const examsForDay = exams.filter(exam => {
+        if (!exam.date) return false;
+        const examDate = toDate(exam.date);
+        if (!examDate) return false;
+        const examDateStr = [
+            examDate.getFullYear(),
+            String(examDate.getMonth() + 1).padStart(2, '0'),
+            String(examDate.getDate()).padStart(2, '0')
+        ].join('-');
+        return examDateStr === selectedDateStr;
+    });
+
+    if (examsForDay.length > 0) {
+        examsForDay.forEach(exam => {
+            const course = courses.find(c => c.id === exam.courseId);
+            coursesHtml += `<div class="glass-sm" style="border-radius:14px;padding:14px 16px;margin-top:8px;display:flex;align-items:center;gap:12px">
+                <span class="material-symbols-outlined" style="font-size:22px;color:#ef4444;flex-shrink:0">assignment</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:14px;font-weight:700;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(exam.title || course?.name || 'Klausur')}</div>
+                    ${course ? `<div style="font-size:12px;color:var(--text-tertiary)">${escapeHtml(course.name)}</div>` : ''}
+                </div>
+                ${exam.creditPoints ? `<div style="font-size:12px;font-weight:600;color:#ef4444;flex-shrink:0">${exam.creditPoints} LP</div>` : ''}
+            </div>`;
+        });
     }
 
     // === Compact LP + GPA Card ===
@@ -461,10 +559,11 @@ function wireExpandCards(content) {
 
     // Delete course
     content.querySelectorAll('.delete-course-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const course = appState.allCourses.find(c => c.id === btn.dataset.id);
             if (course && confirm(`Kurs "${course.name}" und alle zugehörigen Daten löschen?`)) {
+                await deleteCalendarEventsForCourse(btn.dataset.id);
                 deleteCourse(btn.dataset.id);
             }
         });
@@ -480,9 +579,14 @@ function wireExpandCards(content) {
 
     // Delete exam
     content.querySelectorAll('.delete-exam-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
+        btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (confirm('Klausur löschen?')) deleteExam(btn.dataset.id);
+            if (confirm('Klausur löschen?')) {
+                const examId = btn.dataset.id;
+                const examEvent = (appState.allEvents || []).find(ev => ev.examId === examId);
+                if (examEvent) await deleteEvent(examEvent.id);
+                deleteExam(examId);
+            }
         });
     });
 
@@ -621,6 +725,8 @@ function openEditCourseModal(course) {
             endTime: localSlots[0]?.endTime || '09:30',
             color: activeColor ? activeColor.dataset.color : course.color
         });
+        await deleteCalendarEventsForCourse(course.id);
+        await generateCourseCalendarEvents({ id: course.id, name, timeSlots: localSlots });
         modal.remove();
     });
 }
@@ -725,16 +831,30 @@ function openAddExamModal(courseId, creditHours = 0) {
     modal.querySelector('#ea-save').addEventListener('click', async () => {
         const title = modal.querySelector('#ea-title').value.trim();
         if (!title) return;
-        await addExam({
+        const examDate = modal.querySelector('#ea-date').value || null;
+        const examTime = modal.querySelector('#ea-time').value;
+        const ref = await addExam({
             courseId,
             title,
-            date: modal.querySelector('#ea-date').value || null,
-            time: modal.querySelector('#ea-time').value,
+            date: examDate,
+            time: examTime,
             room: modal.querySelector('#ea-room').value.trim(),
             creditPoints: parseInt(modal.querySelector('#ea-credit').value) || 0,
             weight: parseFloat(modal.querySelector('#ea-weight').value) || 1,
             grade: null
         });
+        if (examDate) {
+            const course = appState.allCourses.find(c => c.id === courseId);
+            await addEvent({
+                title: title || (course ? course.name + ' Prüfung' : 'Klausur'),
+                date: examDate,
+                time: examTime || null,
+                endTime: null,
+                category: 'Uni',
+                recurrence: null,
+                examId: ref.id
+            });
+        }
         modal.remove();
     });
 

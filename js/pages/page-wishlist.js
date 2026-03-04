@@ -7,11 +7,11 @@ let initialized = false;
 let currentCategory = 'all';
 let currentSort = 'nutzen';
 
-const CATEGORIES = ['Film', 'Spiel', 'Hardware', 'Buch', 'Kleidung', 'Sonstiges'];
-const CATEGORY_ICONS = {
-    'Film': 'movie', 'Spiel': 'sports_esports', 'Hardware': 'memory',
-    'Buch': 'menu_book', 'Kleidung': 'checkroom', 'Sonstiges': 'category'
-};
+function getCategories() { return appState.wishlistCategories || []; }
+function getCatIcon(name) {
+    const cat = getCategories().find(c => c.name === name);
+    return cat?.icon || 'category';
+}
 
 export function initPageWishlist() {
     if (initialized) return;
@@ -75,7 +75,7 @@ function renderFilters() {
     const filtersEl = document.querySelector('#wishlist-filters');
     if (!filtersEl) return;
 
-    const filters = [{ key: 'all', label: 'Alle' }, ...CATEGORIES.map(c => ({ key: c, label: c }))];
+    const filters = [{ key: 'all', label: 'Alle' }, ...getCategories().map(c => ({ key: c.name, label: c.name }))];
 
     filtersEl.innerHTML = filters.map(f =>
         `<button class="tab-btn ${currentCategory === f.key ? 'active' : ''}" data-filter="${escapeAttr(f.key)}">${escapeHtml(f.label)}</button>`
@@ -189,7 +189,7 @@ function renderStars(nutzen) {
 }
 
 function renderWishlistCard(item, isPurchased = false) {
-    const icon = CATEGORY_ICONS[item.category] || 'category';
+    const icon = getCatIcon(item.category);
     const titleStyle = isPurchased ? 'text-decoration:line-through;color:var(--text-tertiary)' : '';
 
     // Date display
@@ -272,7 +272,7 @@ function openWishlistModal(existing = null) {
                 placeholder="Titel" value="${existing ? escapeAttr(existing.title || '') : ''}">
 
             <select id="wish-category" class="glass-select w-full mb-3">
-                ${CATEGORIES.map(c => `<option value="${escapeAttr(c)}" ${existing?.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+                ${getCategories().map(c => `<option value="${escapeAttr(c.name)}" ${existing?.category === c.name ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
             </select>
 
             <div class="flex gap-2 mb-3">

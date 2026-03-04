@@ -42,11 +42,13 @@ export const appState = {
     allExams: [],
     allAssignments: [],
     allWishlistItems: [],
+    wishlistCategories: [],    // Firestore-backed wishlist categories
     allHabits: [],
     habitLogs: [],
     allFlashcards: [],
     allSemesters: [],
     allEvents: [],             // calendar Termine
+    calendarCategories: [],    // Firestore-backed event categories
     settings: { theme: 'light', notifications: false }
 };
 
@@ -491,18 +493,22 @@ let coursesUnsub = null;
 let examsUnsub = null;
 let assignmentsUnsub = null;
 let wishlistUnsub = null;
+let wishlistCategoriesUnsub = null;
 let habitsUnsub = null;
 let habitLogsUnsub = null;
 let flashcardsUnsub = null;
 let semestersUnsub = null;
 let eventsUnsub = null;
+let calendarCategoriesUnsub = null;
 
 async function subscribeToData() {
     const {
         subscribeTodos, subscribeLists,
         subscribeCourses, subscribeExams, subscribeAssignments,
-        subscribeWishlistItems, subscribeHabits, subscribeHabitLogs,
-        subscribeFlashcards, subscribeSemesters, subscribeEvents
+        subscribeWishlistItems, subscribeWishlistCategories, addWishlistCategory,
+        subscribeHabits, subscribeHabitLogs,
+        subscribeFlashcards, subscribeSemesters, subscribeEvents,
+        subscribeCalendarCategories, addCalendarCategory
     } = await import('./db.js');
     const { isToday, isOverdue } = await import('./utils.js');
 
@@ -539,6 +545,27 @@ async function subscribeToData() {
         notifyStateChange();
     });
 
+    let wlCatSeeded = false;
+    wishlistCategoriesUnsub = subscribeWishlistCategories(async (categories) => {
+        if (categories.length === 0 && !wlCatSeeded) {
+            wlCatSeeded = true;
+            const defaults = [
+                { name: 'Film',      icon: 'movie',           isDefault: true },
+                { name: 'Spiel',     icon: 'sports_esports',  isDefault: true },
+                { name: 'Hardware',  icon: 'memory',          isDefault: true },
+                { name: 'Buch',      icon: 'menu_book',       isDefault: true },
+                { name: 'Kleidung',  icon: 'checkroom',       isDefault: true },
+                { name: 'Sonstiges', icon: 'category',        isDefault: true, locked: true },
+            ];
+            for (const cat of defaults) {
+                await addWishlistCategory(cat.name, cat.icon, { isDefault: cat.isDefault, ...(cat.locked ? { locked: true } : {}) });
+            }
+            return; // next snapshot will notify with populated data
+        }
+        appState.wishlistCategories = categories;
+        notifyStateChange();
+    });
+
     habitsUnsub = subscribeHabits((habits) => {
         appState.allHabits = habits;
         notifyStateChange();
@@ -563,6 +590,25 @@ async function subscribeToData() {
         appState.allEvents = events;
         notifyStateChange();
     });
+
+    let calCatSeeded = false;
+    calendarCategoriesUnsub = subscribeCalendarCategories(async (categories) => {
+        if (categories.length === 0 && !calCatSeeded) {
+            calCatSeeded = true;
+            const defaults = [
+                { name: 'Uni',        color: '#3742fa', sortOrder: 0 },
+                { name: 'Wünsche',    color: '#a855f7', sortOrder: 1 },
+                { name: 'Todos',      color: '#f59e0b', sortOrder: 2 },
+                { name: 'Persönlich', color: '#4ade80', sortOrder: 3 },
+                { name: 'Arbeit',     color: '#60a5fa', sortOrder: 4 },
+                { name: 'Sonstiges',  color: '#6b7280', sortOrder: 5 },
+            ];
+            for (const cat of defaults) await addCalendarCategory(cat);
+            return; // next snapshot will notify with populated data
+        }
+        appState.calendarCategories = categories;
+        notifyStateChange();
+    });
 }
 
 function unsubscribeData() {
@@ -572,9 +618,11 @@ function unsubscribeData() {
     if (examsUnsub) { examsUnsub(); examsUnsub = null; }
     if (assignmentsUnsub) { assignmentsUnsub(); assignmentsUnsub = null; }
     if (wishlistUnsub) { wishlistUnsub(); wishlistUnsub = null; }
+    if (wishlistCategoriesUnsub) { wishlistCategoriesUnsub(); wishlistCategoriesUnsub = null; }
     if (habitsUnsub) { habitsUnsub(); habitsUnsub = null; }
     if (habitLogsUnsub) { habitLogsUnsub(); habitLogsUnsub = null; }
     if (eventsUnsub) { eventsUnsub(); eventsUnsub = null; }
+    if (calendarCategoriesUnsub) { calendarCategoriesUnsub(); calendarCategoriesUnsub = null; }
     if (flashcardsUnsub) { flashcardsUnsub(); flashcardsUnsub = null; }
     if (semestersUnsub) { semestersUnsub(); semestersUnsub = null; }
 }

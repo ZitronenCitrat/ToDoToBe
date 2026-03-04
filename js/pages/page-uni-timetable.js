@@ -1,7 +1,71 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
-import { addCourse, updateCourse, deleteCourse, skipCourseDate, unskipCourseDate, migrateCourseToTimeSlots } from '../db.js';
+import { addCourse, updateCourse, deleteCourse, skipCourseDate, unskipCourseDate, migrateCourseToTimeSlots, addEvent, deleteEvent } from '../db.js';
 import { toInputDate, isTodayLectureDay, getActiveSemester, escapeHtml, escapeAttr } from '../utils.js';
+
+// ===== Calendar Event Sync Helpers =====
+
+async function generateCourseCalendarEvents(course) {
+    const activeSemester = getActiveSemester(appState.allSemesters || []);
+    if (!activeSemester) return;
+
+    const lectureStart = activeSemester.lectureStart.toDate
+        ? activeSemester.lectureStart.toDate()
+        : new Date(activeSemester.lectureStart);
+    const lectureEnd = activeSemester.lectureEnd.toDate
+        ? activeSemester.lectureEnd.toDate()
+        : new Date(activeSemester.lectureEnd);
+    const holidays = activeSemester.holidays || [];
+
+    function isHolidayDate(date) {
+        return holidays.some(h => {
+            const hStart = h.start.toDate ? h.start.toDate() : new Date(h.start);
+            const hEnd = h.end.toDate ? h.end.toDate() : new Date(h.end);
+            return date >= hStart && date <= hEnd;
+        });
+    }
+
+    function getFirstOccurrence(startDate, weekday) {
+        const d = new Date(startDate);
+        const jsWeekday = weekday === 6 ? 0 : weekday + 1;
+        while (d.getDay() !== jsWeekday) d.setDate(d.getDate() + 1);
+        return d;
+    }
+
+    for (const slot of (course.timeSlots || [])) {
+        let current = getFirstOccurrence(lectureStart, slot.weekday);
+        while (current <= lectureEnd) {
+            if (!isHolidayDate(current)) {
+                const dateStr = [
+                    current.getFullYear(),
+                    String(current.getMonth() + 1).padStart(2, '0'),
+                    String(current.getDate()).padStart(2, '0')
+                ].join('-');
+                const alreadyExists = (appState.allEvents || []).some(ev => {
+                    if (ev.courseId !== course.id || ev.time !== slot.startTime) return false;
+                    if (!ev.date) return false;
+                    const evStr = ev.date.toDate
+                        ? ev.date.toDate().toISOString().split('T')[0]
+                        : String(ev.date).split('T')[0];
+                    return evStr === dateStr;
+                });
+                if (!alreadyExists) {
+                    await addEvent({
+                        title: course.name,
+                        date: dateStr,
+                        time: slot.startTime,
+                        endTime: slot.endTime,
+                        category: 'Uni',
+                        recurrence: null,
+                        courseId: course.id
+                    });
+                }
+            }
+            current = new Date(current);
+            current.setDate(current.getDate() + 7);
+        }
+    }
+}
 
 let initialized = false;
 let currentView = 'week';   // 'week' | 'day'
@@ -434,7 +498,7 @@ function openAddCourseModal() {
 
         const activeColor = modal.querySelector('#course-colors .color-btn.active');
 
-        await addCourse({
+        const ref = await addCourse({
             name,
             instructor: modal.querySelector('#course-instructor').value.trim(),
             room: modal.querySelector('#course-room').value.trim(),
@@ -446,6 +510,7 @@ function openAddCourseModal() {
             startTime: localSlots[0]?.startTime || '08:00',
             endTime: localSlots[0]?.endTime || '09:30'
         });
+        await generateCourseCalendarEvents({ id: ref.id, name, timeSlots: localSlots });
         modal.remove();
     });
 

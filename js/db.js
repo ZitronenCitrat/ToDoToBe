@@ -438,6 +438,32 @@ export async function toggleWishlistItem(itemId, purchased) {
     });
 }
 
+// ===== Wishlist Categories =====
+
+export function subscribeWishlistCategories(callback) {
+    const q = query(userCol('wishlistCategories'), orderBy('name', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const items = [];
+        snapshot.forEach((d) => items.push({ id: d.id, ...d.data() }));
+        callback(items);
+    });
+}
+
+export async function addWishlistCategory(name, icon, extras = {}) {
+    const ref = await addDoc(userCol('wishlistCategories'), {
+        name, icon, isDefault: false, ...extras
+    });
+    return ref.id;
+}
+
+export async function updateWishlistCategory(categoryId, name, icon) {
+    return updateDoc(userDoc('wishlistCategories', categoryId), { name, icon });
+}
+
+export async function deleteWishlistCategory(categoryId) {
+    return deleteDoc(userDoc('wishlistCategories', categoryId));
+}
+
 // ===== Habits =====
 
 export function subscribeHabits(callback) {
@@ -664,6 +690,8 @@ export async function addEvent(data) {
         recurrence: data.recurrence || 'none', // 'none' | 'daily' | 'weekly' | 'monthly'
         notes: data.notes || '',
         color: data.color || null,
+        ...(data.courseId ? { courseId: data.courseId } : {}),
+        ...(data.examId ? { examId: data.examId } : {}),
         createdAt: Timestamp.now()
     });
     gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, endTime: data.endTime, category: data.category });
@@ -682,4 +710,32 @@ export async function updateEvent(eventId, updates) {
 
 export async function deleteEvent(eventId) {
     return deleteDoc(userDoc('events', eventId));
+}
+
+// ===== Calendar Categories =====
+
+export function subscribeCalendarCategories(callback) {
+    const q = query(userCol('calendarCategories'), orderBy('sortOrder', 'asc'));
+    return onSnapshot(q, (snapshot) => {
+        const items = [];
+        snapshot.forEach((d) => items.push({ id: d.id, ...d.data() }));
+        callback(items);
+    });
+}
+
+export async function addCalendarCategory(data) {
+    return addDoc(userCol('calendarCategories'), {
+        name: data.name || '',
+        color: data.color || '#6b7280',
+        sortOrder: data.sortOrder ?? 999,
+        createdAt: Timestamp.now()
+    });
+}
+
+export async function updateCalendarCategory(id, updates) {
+    return updateDoc(userDoc('calendarCategories', id), updates);
+}
+
+export async function deleteCalendarCategory(id) {
+    return deleteDoc(userDoc('calendarCategories', id));
 }

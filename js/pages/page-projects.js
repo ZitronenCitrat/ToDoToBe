@@ -13,12 +13,10 @@ export function initPageProjects() {
 
     container.innerHTML = `
         <div class="page-header">
+            <button class="icon-btn" id="projects-back-btn">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
             <h1 class="page-header-title page-title">Meine Projekte</h1>
-            <div class="page-header-actions">
-                <button class="avatar-btn" id="projects-avatar-btn">
-                    <img src="" alt="" id="projects-avatar-img">
-                </button>
-            </div>
         </div>
         <div class="px-5 flex-1">
             <div id="projects-overview" class="glass p-4 mb-5"></div>
@@ -26,9 +24,7 @@ export function initPageProjects() {
         </div>
     `;
 
-    container.querySelector('#projects-avatar-btn').addEventListener('click', () => {
-        navigate('settings');
-    });
+    document.getElementById('projects-back-btn').addEventListener('click', () => navigate('todo'));
 
     registerFabAction('projects', openNewListModal);
 
@@ -43,13 +39,6 @@ export function initPageProjects() {
 function renderProjects() {
     const container = document.getElementById('page-projects');
     if (!container) return;
-
-    // Avatar
-    if (appState.user) {
-        const img = container.querySelector('#projects-avatar-img');
-        img.src = appState.user.photoURL || '';
-        img.alt = appState.user.displayName || '';
-    }
 
     const allActive = appState.allTodos.filter(t => !t.completed);
     const allCompleted = appState.allTodos.filter(t => t.completed);

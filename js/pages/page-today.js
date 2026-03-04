@@ -1,8 +1,8 @@
 import { appState, onStateChange } from '../app.js';
 import { createTodoElement } from '../todo-item.js';
 import { onRouteChange, navigate } from '../router.js';
-import { isToday, isOverdue, formatTodayHeader, todayDateStr, isTodoActiveOnDate } from '../utils.js';
-import { updateTodo } from '../db.js';
+import { isToday, isOverdue, formatTodayHeader, todayDateStr, isTodoActiveOnDate, escapeHtml } from '../utils.js';
+import { updateTodo, toggleHabitLog } from '../db.js';
 
 let stateUnsub = null;
 let routeUnsub = null;
@@ -22,9 +22,6 @@ export function initPageToday() {
             <div class="page-header-actions">
                 <button class="icon-btn" id="today-review-btn" title="Wöchentlicher Review">
                     <span class="material-symbols-outlined">event_note</span>
-                </button>
-                <button class="avatar-btn" id="today-avatar-btn">
-                    <img src="" alt="" id="today-avatar-img">
                 </button>
             </div>
         </div>
@@ -60,7 +57,6 @@ export function initPageToday() {
 
     container.querySelector('#today-settings-btn').addEventListener('click', () => navigate('settings'));
     container.querySelector('#today-review-btn').addEventListener('click', () => navigate('weekly-review'));
-    container.querySelector('#today-avatar-btn').addEventListener('click', () => navigate('settings'));
     container.querySelector('#today-projects-btn').addEventListener('click', () => navigate('projects'));
     container.querySelector('#today-stats-btn').addEventListener('click', () => navigate('stats'));
     container.querySelector('#today-habits-btn').addEventListener('click', () => navigate('habits'));
@@ -91,18 +87,21 @@ function needsReset(todo) {
     return todo.lastResetDate !== today;
 }
 
+function isRecurringDueToday(t) {
+    if (!t.recurrence) return false;
+    const d = new Date();
+    if (t.recurrence === 'daily') return true;
+    if (t.recurrence === 'weekly') return t.recurrenceDay === d.getDay();
+    if (t.recurrence === 'monthly') return !!t.dueDate && new Date(t.dueDate).getDate() === d.getDate();
+    return false;
+}
+
 function renderToday() {
     const container = document.getElementById('page-today');
     if (!container) return;
 
     const dateLabel = container.querySelector('#today-date-label');
     dateLabel.textContent = formatTodayHeader();
-
-    if (appState.user) {
-        const img = container.querySelector('#today-avatar-img');
-        img.src = appState.user.photoURL || '';
-        img.alt = appState.user.displayName || '';
-    }
 
     // Recurring todos (daily focus)
     const recurringTodos = appState.allTodos.filter(t => isRecurringToday(t));
@@ -178,17 +177,31 @@ function renderToday() {
         ? appState.allTodos.filter(t => t.listId === inboxId && t.completed && !t.dueDate && !t.recurrence)
         : [];
 
-    const activeTodos = [...todayTodos, ...inboxActive].sort((a, b) => a.priority - b.priority);
+    // Recurring tasks due today (completion tracked via completedDates, not t.completed)
+    const recurringDueToday = appState.allTodos.filter(t => isRecurringDueToday(t));
+    const recurringActive = recurringDueToday.filter(t => !(t.completedDates || []).includes(today));
+    const recurringDoneCount = recurringDueToday.length - recurringActive.length;
+
+    // Habits due today
+    const todayDayOfWeek = new Date().getDay();
+    const habitsDueToday = (appState.allHabits || []).filter(h =>
+        !h.archived && (h.frequency === 'daily' || (h.frequency === 'weekly' && h.weekday === todayDayOfWeek))
+    );
+    const habitsDoneCount = habitsDueToday.filter(h =>
+        appState.habitLogs.some(l => l.habitId === h.id && l.date === today && l.completed)
+    ).length;
+
+    const activeTodos = [...todayTodos, ...inboxActive, ...recurringActive].sort((a, b) => a.priority - b.priority);
     const allCompleted = [...completedToday, ...inboxCompleted];
-    const totalToday = activeTodos.length + allCompleted.length;
-    const doneToday = allCompleted.length;
+    const totalToday = activeTodos.length + allCompleted.length + recurringDoneCount + habitsDueToday.length;
+    const doneToday = allCompleted.length + recurringDoneCount + habitsDoneCount;
 
     renderGoalCard(container, doneToday, totalToday);
 
     const todoList = container.querySelector('#today-todo-list');
     todoList.innerHTML = '';
 
-    if (activeTodos.length === 0 && allCompleted.length === 0 && recurringTodos.length === 0) {
+    if (activeTodos.length === 0 && allCompleted.length === 0 && recurringTodos.length === 0 && habitsDueToday.length === 0) {
         todoList.innerHTML = `
             <div class="empty-state">
                 <span class="material-symbols-outlined">task_alt</span>
@@ -203,6 +216,37 @@ function renderToday() {
                 listColor: listInfo?.color || ''
             });
             el.addEventListener('click', () => navigate('task', { id: todo.id }));
+            todoList.appendChild(el);
+        });
+        habitsDueToday.forEach(habit => {
+            const isCompleted = appState.habitLogs.some(
+                l => l.habitId === habit.id && l.date === today && l.completed
+            );
+            const el = document.createElement('div');
+            el.className = 'todo-item habit-today-item';
+            el.dataset.habitId = habit.id;
+            el.innerHTML = `
+                <button class="habit-today-toggle ${isCompleted ? 'completed' : ''}">
+                    <span class="material-symbols-outlined">
+                        ${isCompleted ? 'check_circle' : 'radio_button_unchecked'}
+                    </span>
+                </button>
+                <div class="todo-item-content">
+                    <span class="todo-item-title ${isCompleted ? 'completed' : ''}">
+                        ${escapeHtml(habit.title)}
+                    </span>
+                    <span class="todo-item-meta">
+                        <span class="material-symbols-outlined" style="font-size:12px">
+                            ${escapeHtml(habit.icon || 'fitness_center')}
+                        </span>
+                        Gewohnheit
+                    </span>
+                </div>
+            `;
+            el.querySelector('.habit-today-toggle').addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleHabitLog(habit.id, today);
+            });
             todoList.appendChild(el);
         });
     }

@@ -166,7 +166,7 @@ input, textarea, select {
     background: var(--surface);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--surface-border);
+    border: 1px solid rgba(255,255,255,0.07);
     border-radius: 12px;
 }
 
@@ -392,11 +392,13 @@ input, textarea, select {
     gap: 2px;
     padding: 8px 4px;
     flex: 1;
+    min-height: 56px;
+    height: 56px;
     background: none;
     border: none;
     color: var(--text-tertiary);
     cursor: pointer;
-    transition: color 0.2s, background 0.2s;
+    transition: color 0.2s, background-color 0ms;
     position: relative;
     border-radius: 22px;
     min-width: 0;
@@ -404,7 +406,8 @@ input, textarea, select {
 
 .nav-tab.active {
     color: var(--accent);
-    background: rgba(var(--accent-rgb), 0.12);
+    background-color: rgba(180, 100, 5, 0.38);
+    border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .nav-tab .material-symbols-outlined {
@@ -417,14 +420,24 @@ input, textarea, select {
 }
 
 .nav-tab-label {
-    font-size: 10px;
+    display: block;
+    height: 14px;
+    font-size: 0px;
     font-weight: 500;
     letter-spacing: 0.01em;
     color: inherit;
+    line-height: 1;
     overflow: hidden;
-    text-overflow: ellipsis;
+    transition: font-size 0ms;
     white-space: nowrap;
     max-width: 100%;
+}
+
+.nav-tab.active .nav-tab-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.3px;
 }
 
 .nav-tab-spacer {
@@ -449,6 +462,22 @@ input, textarea, select {
     justify-content: center;
     line-height: 1;
 }
+
+.section-header-link {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+}
+.section-header-link:hover { color: var(--text-secondary); }
 
 .nav-tab-badge:empty {
     display: none;
@@ -1634,7 +1663,7 @@ input, textarea, select {
 }
 
 .uni-day-btn .day-name {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--text-tertiary);
     margin-bottom: 2px;

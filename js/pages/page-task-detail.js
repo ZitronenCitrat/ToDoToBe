@@ -19,7 +19,7 @@ export function initPageTaskDetail() {
 
     container.innerHTML = `
         <div class="page-header">
-            <button class="icon-btn" id="task-back-btn">
+            <button class="icon-btn" id="task-detail-back-btn">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
             <div class="page-header-actions">
@@ -124,7 +124,7 @@ export function initPageTaskDetail() {
     `;
 
     // Wire up events
-    container.querySelector('#task-back-btn').addEventListener('click', back);
+    container.querySelector('#task-detail-back-btn').addEventListener('click', () => history.back());
 
     container.querySelector('#task-delete-btn').addEventListener('click', async () => {
         if (!currentTodoId) return;
