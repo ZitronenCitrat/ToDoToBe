@@ -113,17 +113,19 @@ function calcOverallGPA() {
 
 // ===== Calendar Event Sync Helpers =====
 
-async function generateCourseCalendarEvents(course) {
-    const activeSemester = getActiveSemester(appState.allSemesters || []);
-    if (!activeSemester) return;
+export async function generateCourseCalendarEvents(course) {
+    const semesters = appState.allSemesters || [];
+    const semester = (course.semesterId && semesters.find(s => s.id === course.semesterId))
+        || getActiveSemester(semesters);
+    if (!semester) return;
 
-    const lectureStart = activeSemester.lectureStart.toDate
-        ? activeSemester.lectureStart.toDate()
-        : new Date(activeSemester.lectureStart);
-    const lectureEnd = activeSemester.lectureEnd.toDate
-        ? activeSemester.lectureEnd.toDate()
-        : new Date(activeSemester.lectureEnd);
-    const holidays = activeSemester.holidays || [];
+    const lectureStart = semester.lectureStart.toDate
+        ? semester.lectureStart.toDate()
+        : new Date(semester.lectureStart);
+    const lectureEnd = semester.lectureEnd.toDate
+        ? semester.lectureEnd.toDate()
+        : new Date(semester.lectureEnd);
+    const holidays = semester.holidays || [];
 
     function isHolidayDate(date) {
         return holidays.some(h => {
@@ -778,7 +780,7 @@ function openEditCourseModal(course) {
             color: activeColor ? activeColor.dataset.color : course.color
         });
         await deleteCalendarEventsForCourse(course.id);
-        await generateCourseCalendarEvents({ id: course.id, name, timeSlots: localSlots });
+        await generateCourseCalendarEvents({ id: course.id, name, timeSlots: localSlots, semesterId: course.semesterId });
         modal.remove();
     });
 }

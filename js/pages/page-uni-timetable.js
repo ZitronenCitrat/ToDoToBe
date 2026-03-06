@@ -124,14 +124,27 @@ function renderDayNav(container) {
     }, { passive: true });
 }
 
+/** Returns true if any course has a lecture day today (uses per-course semester). */
+function hasAnyLectureToday() {
+    const semesters = appState.allSemesters || [];
+    return appState.allCourses.some(course => {
+        const semester = (course.semesterId && semesters.find(s => s.id === course.semesterId))
+            || getActiveSemester(semesters);
+        return isTodayLectureDay(semester);
+    });
+}
+
 /** Get all slots (from courses + additional events) for a given weekday */
 function getSlotsForDay(dayIdx) {
-    const activeSemester = getActiveSemester(appState.allSemesters || []);
-    if (!isTodayLectureDay(activeSemester)) return [];
-
+    const semesters = appState.allSemesters || [];
     const items = [];
 
     appState.allCourses.forEach(course => {
+        // Use the course's own semester, not the globally active one
+        const semester = (course.semesterId && semesters.find(s => s.id === course.semesterId))
+            || getActiveSemester(semesters);
+        if (!isTodayLectureDay(semester)) return;
+
         const slots = course.timeSlots && course.timeSlots.length > 0
             ? course.timeSlots
             : (course.weekdays || []).map(wd => ({ weekday: wd, startTime: course.startTime, endTime: course.endTime }));
@@ -164,8 +177,6 @@ function render() {
 
 function renderWeekView(content) {
     const courses = appState.allCourses;
-    const activeSemester = getActiveSemester(appState.allSemesters || []);
-    const isLecture = isTodayLectureDay(activeSemester);
 
     if (courses.length === 0) {
         content.innerHTML = `<div class="empty-state">
@@ -175,7 +186,7 @@ function renderWeekView(content) {
         return;
     }
 
-    if (!isLecture) {
+    if (!hasAnyLectureToday()) {
         content.innerHTML = `<div class="glass-sm p-4 text-center" style="color:var(--text-tertiary)">Vorlesungsfrei / Ferien</div>`;
         return;
     }
@@ -261,11 +272,10 @@ function renderWeekView(content) {
 function renderDayViewContent(content) {
     const dayIdx = getEffectiveDayIdx();
     const slots = getSlotsForDay(dayIdx);
-    const activeSemester = getActiveSemester(appState.allSemesters || []);
 
     let html = `<div style="font-size:16px;font-weight:600;margin-bottom:12px">${WEEKDAYS_FULL[dayIdx]}</div>`;
 
-    if (!isTodayLectureDay(activeSemester)) {
+    if (!hasAnyLectureToday()) {
         html += `<div class="glass-sm p-4 text-center" style="color:var(--text-tertiary)">Vorlesungsfrei / Ferien</div>`;
         content.innerHTML = html;
         return;
@@ -435,18 +445,22 @@ function openAddCourseModal() {
 
         const activeColor = modal.querySelector('#course-colors .color-btn.active');
 
-        await addCourse({
+        const semesterId = modal.querySelector('#course-semester').value || null;
+        const ref = await addCourse({
             name,
             instructor: modal.querySelector('#course-instructor').value.trim(),
             room: modal.querySelector('#course-room').value.trim(),
             creditHours: parseInt(modal.querySelector('#course-credit-hours').value) || 0,
-            semesterId: modal.querySelector('#course-semester').value || null,
+            semesterId,
             color: activeColor ? activeColor.dataset.color : '#3742fa',
             timeSlots: localSlots,
             weekdays: localSlots.map(s => s.weekday),
             startTime: localSlots[0]?.startTime || '08:00',
             endTime: localSlots[0]?.endTime || '09:30'
         });
+        // Generate calendar events for the new course (with correct semester)
+        const { generateCourseCalendarEvents } = await import('./page-uni.js');
+        await generateCourseCalendarEvents({ id: ref.id, name, timeSlots: localSlots, semesterId });
         modal.remove();
     });
 

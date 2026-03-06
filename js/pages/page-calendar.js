@@ -122,15 +122,18 @@ export function initPageCalendar() {
 // ----- helpers -----
 
 function getCourseSlotsForDate(date) {
-    const semester = getActiveSemester(appState.allSemesters);
-    if (!isTodayLectureDay(semester, date)) return [];
-
     // Convert JS weekday (0=Sun) to Mon-based index (Mon=0 ... Sun=6)
     const jsDay = date.getDay();
     const weekdayIdx = jsDay === 0 ? 6 : jsDay - 1;
+    const semesters = appState.allSemesters || [];
 
     const slots = [];
     appState.allCourses.forEach(course => {
+        // Use the course's own semester, not the globally active one
+        const semester = (course.semesterId && semesters.find(s => s.id === course.semesterId))
+            || getActiveSemester(semesters);
+        if (!isTodayLectureDay(semester, date)) return;
+
         (course.timeSlots || []).forEach(slot => {
             if (slot.weekday === weekdayIdx) {
                 slots.push({ course, slot, type: 'course' });
