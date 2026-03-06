@@ -1,6 +1,6 @@
 import { appState, onStateChange } from '../app.js';
 import { onRouteChange } from '../router.js';
-import { toDate, startOfDay, escapeHtml } from '../utils.js';
+import { toDate, startOfDay, escapeHtml, safeCssColor } from '../utils.js';
 
 let activeFilter = '7d';
 let initialized = false;
@@ -195,13 +195,13 @@ function renderBreakdown(breakdownEl, completedInRange) {
                 <div class="mb-3">
                     <div class="flex items-center justify-between mb-1">
                         <div class="flex items-center gap-2">
-                            <div style="width:8px;height:8px;border-radius:50%;background:${l.color}"></div>
+                            <div style="width:8px;height:8px;border-radius:50%;background:${safeCssColor(l.color)}"></div>
                             <span style="font-size:14px">${escapeHtml(l.name)}</span>
                         </div>
                         <span style="font-size:13px;color:var(--text-tertiary)">${progress}%</span>
                     </div>
                     <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
-                        <div style="height:100%;width:${progress}%;background:${l.color};border-radius:2px;transition:width 0.3s"></div>
+                        <div style="height:100%;width:${progress}%;background:${safeCssColor(l.color)};border-radius:2px;transition:width 0.3s"></div>
                     </div>
                 </div>
             `;

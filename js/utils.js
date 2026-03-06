@@ -255,6 +255,20 @@ export function formatPrice(price) {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(price);
 }
 
+// ===== CSS Color Sanitization =====
+
+/**
+ * Returns a safe CSS color string.
+ * Accepts: #rgb, #rrggbb, #rrggbbaa hex values, and CSS variable references.
+ * Rejects anything else (injection attempt) and returns the fallback.
+ */
+export function safeCssColor(color, fallback = '#3742fa') {
+    if (!color) return fallback;
+    if (/^#[0-9a-fA-F]{3,8}$/.test(color)) return color;
+    if (/^var\(--[\w-]+\)$/.test(color)) return color;
+    return fallback;
+}
+
 // ===== HTML Escaping =====
 
 export function escapeHtml(text) {

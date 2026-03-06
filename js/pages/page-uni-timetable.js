@@ -1,71 +1,7 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
-import { addCourse, updateCourse, deleteCourse, skipCourseDate, unskipCourseDate, migrateCourseToTimeSlots, addEvent, deleteEvent } from '../db.js';
-import { toInputDate, isTodayLectureDay, getActiveSemester, escapeHtml, escapeAttr } from '../utils.js';
-
-// ===== Calendar Event Sync Helpers =====
-
-async function generateCourseCalendarEvents(course) {
-    const activeSemester = getActiveSemester(appState.allSemesters || []);
-    if (!activeSemester) return;
-
-    const lectureStart = activeSemester.lectureStart.toDate
-        ? activeSemester.lectureStart.toDate()
-        : new Date(activeSemester.lectureStart);
-    const lectureEnd = activeSemester.lectureEnd.toDate
-        ? activeSemester.lectureEnd.toDate()
-        : new Date(activeSemester.lectureEnd);
-    const holidays = activeSemester.holidays || [];
-
-    function isHolidayDate(date) {
-        return holidays.some(h => {
-            const hStart = h.start.toDate ? h.start.toDate() : new Date(h.start);
-            const hEnd = h.end.toDate ? h.end.toDate() : new Date(h.end);
-            return date >= hStart && date <= hEnd;
-        });
-    }
-
-    function getFirstOccurrence(startDate, weekday) {
-        const d = new Date(startDate);
-        const jsWeekday = weekday === 6 ? 0 : weekday + 1;
-        while (d.getDay() !== jsWeekday) d.setDate(d.getDate() + 1);
-        return d;
-    }
-
-    for (const slot of (course.timeSlots || [])) {
-        let current = getFirstOccurrence(lectureStart, slot.weekday);
-        while (current <= lectureEnd) {
-            if (!isHolidayDate(current)) {
-                const dateStr = [
-                    current.getFullYear(),
-                    String(current.getMonth() + 1).padStart(2, '0'),
-                    String(current.getDate()).padStart(2, '0')
-                ].join('-');
-                const alreadyExists = (appState.allEvents || []).some(ev => {
-                    if (ev.courseId !== course.id || ev.time !== slot.startTime) return false;
-                    if (!ev.date) return false;
-                    const evStr = ev.date.toDate
-                        ? ev.date.toDate().toISOString().split('T')[0]
-                        : String(ev.date).split('T')[0];
-                    return evStr === dateStr;
-                });
-                if (!alreadyExists) {
-                    await addEvent({
-                        title: course.name,
-                        date: dateStr,
-                        time: slot.startTime,
-                        endTime: slot.endTime,
-                        category: 'Uni',
-                        recurrence: null,
-                        courseId: course.id
-                    });
-                }
-            }
-            current = new Date(current);
-            current.setDate(current.getDate() + 7);
-        }
-    }
-}
+import { addCourse, updateCourse, deleteCourse, skipCourseDate, unskipCourseDate, migrateCourseToTimeSlots } from '../db.js';
+import { toInputDate, isTodayLectureDay, getActiveSemester, escapeHtml, escapeAttr, safeCssColor } from '../utils.js';
 
 let initialized = false;
 let currentView = 'week';   // 'week' | 'day'
@@ -284,12 +220,13 @@ function renderWeekView(content) {
             const dateStr = getDateStrForWeekday(col);
             const skipped = (appState.allCourses.find(c => c.id === item.courseId)?.skippedDates || []).includes(dateStr + (item.isExtra ? `_extra` : ''));
 
+            const safeColor = safeCssColor(item.color);
             html += `<div class="timetable-block ${skipped ? 'skipped' : ''}" style="
                 position:absolute;top:${top}%;left:${left}%;width:${100/5}%;height:${height}%;
-                background:${item.color || '#3742fa'}22;border-left:3px solid ${item.color || '#3742fa'};
+                background:${safeColor}22;border-left:3px solid ${safeColor};
                 border-radius:6px;padding:3px 5px;overflow:hidden;cursor:pointer;font-size:11px;box-sizing:border-box
             " data-course-id="${escapeAttr(item.courseId)}" data-date="${escapeAttr(dateStr)}" data-is-extra="${item.isExtra ? '1' : '0'}">
-                <div style="font-weight:600;color:${item.color || '#3742fa'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name)}</div>
+                <div style="font-weight:600;color:${safeColor};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name)}</div>
                 ${item.room ? `<div style="color:var(--text-tertiary);font-size:10px">${escapeHtml(item.room)}</div>` : ''}
                 ${item.isExtra ? `<div style="color:var(--text-tertiary);font-size:10px">${escapeHtml(item.extraType || 'Übung')}</div>` : ''}
             </div>`;
@@ -345,7 +282,7 @@ function renderDayViewContent(content) {
     slots.forEach(item => {
         const course = appState.allCourses.find(c => c.id === item.courseId);
         const skipped = (course?.skippedDates || []).includes(dateStr);
-        html += `<div class="glass-sm p-4 mb-3 timetable-day-card ${skipped ? 'skipped' : ''}" style="border-left:4px solid ${item.color || '#3742fa'}"
+        html += `<div class="glass-sm p-4 mb-3 timetable-day-card ${skipped ? 'skipped' : ''}" style="border-left:4px solid ${safeCssColor(item.color)}"
             data-course-id="${escapeAttr(item.courseId)}" data-date="${escapeAttr(dateStr)}">
             <div style="font-size:15px;font-weight:600;${skipped ? 'text-decoration:line-through;color:var(--text-tertiary)' : ''}">${escapeHtml(item.name)}</div>
             ${item.isExtra ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">${escapeHtml(item.extraType || 'Übung')}</div>` : ''}
@@ -498,7 +435,7 @@ function openAddCourseModal() {
 
         const activeColor = modal.querySelector('#course-colors .color-btn.active');
 
-        const ref = await addCourse({
+        await addCourse({
             name,
             instructor: modal.querySelector('#course-instructor').value.trim(),
             room: modal.querySelector('#course-room').value.trim(),
@@ -510,7 +447,6 @@ function openAddCourseModal() {
             startTime: localSlots[0]?.startTime || '08:00',
             endTime: localSlots[0]?.endTime || '09:30'
         });
-        await generateCourseCalendarEvents({ id: ref.id, name, timeSlots: localSlots });
         modal.remove();
     });
 

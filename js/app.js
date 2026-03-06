@@ -717,6 +717,7 @@ async function boot() {
                     try {
                         await grantAccess(user.uid, '');
                         hasAccess = true;
+                        console.warn('[access-gate] No config/appAccess configured — gate is inactive, access granted silently. Set config/appAccess in Firestore to enable the access gate.');
                     } catch {
                         // config/appAccess exists → show the gate, wait for user
                         await showAccessGate(user);

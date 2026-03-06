@@ -24,10 +24,17 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId;
 
       // Updating own user doc:
-      // Either the user already has access (normal updates like settings, gcalToken),
+      // Either the user already has access (normal updates restricted to known fields),
       // OR the user is granting access and the accessHash matches the configured hash.
       allow update: if request.auth != null && request.auth.uid == userId && (
-        isAccessGranted(userId)
+        (
+          isAccessGranted(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName', 'email', 'photoURL', 'createdAt',
+            'settings', 'gcalConnected', 'gcalIds',
+            'allowedAccess', 'accessHash'
+          ])
+        )
         || (
           request.resource.data.allowedAccess == true
           && (

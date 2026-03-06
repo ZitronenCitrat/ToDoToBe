@@ -2,6 +2,7 @@ import { appState, onStateChange } from '../app.js';
 import { onRouteChange, getCurrentRoute, back, navigate } from '../router.js';
 import { createTodoElement } from '../todo-item.js';
 import { updateList, deleteList } from '../db.js';
+import { safeCssColor } from '../utils.js';
 
 let currentListId = null;
 let activeTab = 'tasks';
@@ -130,7 +131,7 @@ function renderProject() {
             <circle class="progress-ring-bg" cx="55" cy="55" r="${radius}" stroke-width="8"/>
             <circle class="progress-ring-fill" cx="55" cy="55" r="${radius}" stroke-width="8"
                 stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"
-                style="stroke:${list.color || 'var(--accent)'}"/>
+                style="stroke:${safeCssColor(list.color, 'var(--accent)')}"/>
         </svg>
         <div>
             <div style="font-size:36px;font-weight:700">${Math.round(progress * 100)}%</div>

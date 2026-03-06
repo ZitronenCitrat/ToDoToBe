@@ -4,7 +4,7 @@ import { createTodoElement } from '../todo-item.js';
 import {
     getWeekdayShort, formatMonthYear, getDaysInMonth,
     getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
-    getActiveSemester, isTodayLectureDay, toInputDate, isTodoActiveOnDate
+    getActiveSemester, isTodayLectureDay, toInputDate, isTodoActiveOnDate, safeCssColor
 } from '../utils.js';
 import { addEvent, updateEvent, deleteEvent, addCalendarCategory, deleteCalendarCategory } from '../db.js';
 
@@ -204,7 +204,7 @@ function buildItemsByDay() {
         (wishesByDay[key] = wishesByDay[key] || []).push(w);
     });
 
-    appState.allEvents.forEach(ev => {
+    appState.allEvents.filter(ev => !ev.courseId).forEach(ev => {
         if (!ev.date) return;
         let d;
         if (typeof ev.date === 'string') {
@@ -367,7 +367,7 @@ function renderDayItems() {
         courseSlots.forEach(({ course, slot, extra, type }) => {
             const dateStr = toInputDate(selectedDate);
             const isSkipped = (course.skippedDates || []).includes(dateStr);
-            const color = course.color || '#3742fa';
+            const color = safeCssColor(course.color);
             const timeStr = (slot.startTime && slot.endTime) ? `${slot.startTime}–${slot.endTime}` : '';
             const name = type === 'extra'
                 ? `${escapeHtml(extra.name || 'Übung')} (${escapeHtml(course.name)})`

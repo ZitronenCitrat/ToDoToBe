@@ -33,7 +33,7 @@ export async function initGcal(userId, onStatusChange) {
 
     if (!gcalTokenLoaded) {
         gcalTokenLoaded = true;
-        // Restore token + gcalIds from Firestore user doc
+        // Restore gcalIds + connected flag from Firestore user doc (token is not persisted)
         try {
             const { db } = await import('./app.js');
             const { getDoc, doc: fsDoc } =
@@ -41,18 +41,11 @@ export async function initGcal(userId, onStatusChange) {
             const snap = await getDoc(fsDoc(db, 'users', currentUserId));
             if (snap.exists()) {
                 const data = snap.data();
-                if (data.gcalToken) {
-                    const { token, expiry } = data.gcalToken;
-                    if (Date.now() < expiry - 60_000) {
-                        accessToken = token;
-                        tokenExpiry = expiry;
-                    }
-                }
                 gcalIdsCache = data.gcalIds || {};
                 wasConnected = !!data.gcalConnected;
             }
         } catch (e) {
-            console.warn('[gcal] Could not restore token from Firestore:', e);
+            console.warn('[gcal] Could not restore gcal state from Firestore:', e);
         }
         // FIX 4: Token from Firestore is expired — try silent refresh
         if (wasConnected && !isGcalConnected()) {
@@ -111,18 +104,17 @@ async function _handleTokenResponse(response) {
     tokenExpiry = Date.now() + (response.expires_in * 1000);
     wasConnected = true;
 
-    // Persist token + connected flag to Firestore user doc
+    // Persist connected flag to Firestore (token is kept in-memory only for security)
     if (currentUserId) {
         try {
             const { db } = await import('./app.js');
             const { updateDoc, doc: fsDoc } =
                 await import('https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js');
             await updateDoc(fsDoc(db, 'users', currentUserId), {
-                gcalToken: { token: accessToken, expiry: tokenExpiry },
                 gcalConnected: true,
             });
         } catch (e) {
-            console.warn('[gcal] Could not save token to Firestore:', e);
+            console.warn('[gcal] Could not save gcal state to Firestore:', e);
         }
     }
 
@@ -475,9 +467,9 @@ export async function syncAllToGcal(appState) {
         .filter(t => t.dueDate && !t.completed)
         .forEach(t => tasks.push(verifyAndSyncEntity('todo', t)));
 
-    // Events (Termine)
+    // Events (Termine) — skip course-generated events (shown via timetable, not as extra Termine)
     appState.allEvents
-        .filter(ev => ev.date)
+        .filter(ev => ev.date && !ev.courseId)
         .forEach(ev => tasks.push(verifyAndSyncEntity('event', ev)));
 
     // Exams with dates

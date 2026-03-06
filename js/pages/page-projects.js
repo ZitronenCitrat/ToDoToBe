@@ -1,7 +1,7 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
 import { createList } from '../db.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, safeCssColor } from '../utils.js';
 
 let initialized = false;
 
@@ -78,15 +78,15 @@ function renderProjects() {
         card.style.cssText = 'cursor:pointer;transition:border-color 0.15s';
         card.innerHTML = `
             <div class="flex items-center gap-2 mb-3">
-                <div style="width:32px;height:32px;border-radius:10px;background:${list.color}20;display:flex;align-items:center;justify-content:center">
-                    <span class="material-symbols-outlined" style="font-size:18px;color:${list.color}">${list.isDefault ? 'inbox' : 'folder'}</span>
+                <div style="width:32px;height:32px;border-radius:10px;background:${safeCssColor(list.color)}20;display:flex;align-items:center;justify-content:center">
+                    <span class="material-symbols-outlined" style="font-size:18px;color:${safeCssColor(list.color)}">${list.isDefault ? 'inbox' : 'folder'}</span>
                 </div>
             </div>
             <div style="font-size:15px;font-weight:600;margin-bottom:4px">${escapeHtml(list.name)}</div>
             <div style="font-size:12px;color:var(--text-tertiary)">${listTotal} Aufgaben</div>
             ${listTotal > 0 ? `
             <div style="margin-top:8px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
-                <div style="height:100%;width:${progress}%;background:${list.color};border-radius:2px"></div>
+                <div style="height:100%;width:${progress}%;background:${safeCssColor(list.color)};border-radius:2px"></div>
             </div>` : ''}
         `;
         card.addEventListener('click', () => navigate('project', { id: list.id }));

@@ -1,6 +1,6 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange } from '../router.js';
-import { calculateCourseAverage, escapeHtml, escapeAttr } from '../utils.js';
+import { calculateCourseAverage, escapeHtml, escapeAttr, safeCssColor } from '../utils.js';
 import { addExam, updateExam, deleteExam, updateAssignment, deleteAssignment } from '../db.js';
 
 let initialized = false;
@@ -120,7 +120,7 @@ function render() {
         html += `<div class="glass-sm mb-3 course-grade-card" data-course="${course.id}">
             <div class="p-4 flex items-center justify-between" style="cursor:pointer" data-expand="${course.id}">
                 <div class="flex items-center gap-3">
-                    <div style="width:4px;height:36px;border-radius:2px;background:${course.color || '#3742fa'}"></div>
+                    <div style="width:4px;height:36px;border-radius:2px;background:${safeCssColor(course.color)}"></div>
                     <div>
                         <div style="font-size:15px;font-weight:600">${escapeHtml(course.name)}</div>
                         <div style="font-size:12px;color:var(--text-tertiary)">${courseExams.length + courseAssignments.length} Einträge${course.creditHours ? ' · ' + course.creditHours + ' LP' : ''}</div>
@@ -283,7 +283,7 @@ function openAddExamModal(preselectedCourseId = '', prefilledCreditPoints = 0) {
             <input type="text" id="exam-title" class="glass-input w-full mb-3" placeholder="Titel">
             <select id="exam-course" class="glass-select w-full mb-3">
                 <option value="">Kurs wählen…</option>
-                ${appState.allCourses.map(c => `<option value="${c.id}" data-credit="${c.creditHours || 0}" ${c.id === preselectedCourseId ? 'selected' : ''}>${c.name}</option>`).join('')}
+                ${appState.allCourses.map(c => `<option value="${escapeAttr(c.id)}" data-credit="${escapeAttr(c.creditHours || 0)}" ${c.id === preselectedCourseId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
             </select>
             <input type="date" id="exam-date" class="glass-input w-full mb-3">
             <div class="flex gap-2 mb-3">

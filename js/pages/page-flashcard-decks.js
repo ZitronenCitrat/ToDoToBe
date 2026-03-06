@@ -1,7 +1,7 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
 import { addFlashcard, deleteFlashcard } from '../db.js';
-import { escapeHtml } from '../utils.js';
+import { escapeHtml, safeCssColor } from '../utils.js';
 
 let initialized = false;
 
@@ -71,7 +71,7 @@ function renderDecks() {
         return `
             <div class="glass p-4 mb-3">
                 <div class="flex items-center gap-3 mb-3">
-                    <div style="width:12px;height:12px;border-radius:50%;background:${course.color};flex-shrink:0"></div>
+                    <div style="width:12px;height:12px;border-radius:50%;background:${safeCssColor(course.color)};flex-shrink:0"></div>
                     <span style="font-size:16px;font-weight:600;flex:1">${escapeHtml(course.name)}</span>
                     <button class="icon-btn" data-add-card="${course.id}" title="Karte hinzufügen">
                         <span class="material-symbols-outlined">add</span>

@@ -1,6 +1,6 @@
 import { appState, onStateChange } from '../app.js';
 import { onRouteChange, back, navigate } from '../router.js';
-import { todayDateStr, escapeHtml, escapeAttr } from '../utils.js';
+import { todayDateStr, escapeHtml, escapeAttr, safeCssColor } from '../utils.js';
 import { addHabit, deleteHabit, toggleHabitLog } from '../db.js';
 
 let initialized = false;
@@ -133,7 +133,7 @@ function renderWeekHeatmap(habits) {
             const completed = appState.habitLogs.some(
                 l => l.habitId === habit.id && l.date === dateStr && l.completed
             );
-            html += `<div class="heatmap-dot ${completed ? 'filled' : ''}" style="${completed ? `background:${habit.color || 'var(--accent)'}` : ''}"></div>`;
+            html += `<div class="heatmap-dot ${completed ? 'filled' : ''}" style="${completed ? `background:${safeCssColor(habit.color, 'var(--accent)')}` : ''}"></div>`;
         }
     });
     html += '</div>';

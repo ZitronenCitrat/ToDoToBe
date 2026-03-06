@@ -1,6 +1,6 @@
 import { appState, onStateChange, registerFabAction } from '../app.js';
 import { onRouteChange, navigate } from '../router.js';
-import { toDate, formatDate, isToday, isOverdue, startOfDay, urgencyClass, escapeHtml } from '../utils.js';
+import { toDate, formatDate, isToday, isOverdue, startOfDay, urgencyClass, escapeHtml, escapeAttr } from '../utils.js';
 import { addAssignment, updateAssignment, deleteAssignment } from '../db.js';
 
 let initialized = false;
@@ -176,7 +176,7 @@ function openAddAssignmentModal() {
             <input type="text" id="assign-title" class="glass-input w-full mb-3" placeholder="Titel">
             <select id="assign-course" class="glass-select w-full mb-3">
                 <option value="">Kurs wählen…</option>
-                ${appState.allCourses.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                ${appState.allCourses.map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)}</option>`).join('')}
             </select>
             <input type="date" id="assign-due" class="glass-input w-full mb-3">
             <div class="flex gap-2 mb-4 flex-wrap" id="assign-priority">
