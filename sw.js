@@ -1,4 +1,4 @@
-const CACHE_NAME = 'todotobe-v11';
+const CACHE_NAME = 'todotobe-v12';
 
 const APP_SHELL = [
     './',
