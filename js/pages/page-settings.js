@@ -111,7 +111,7 @@ export function initPageSettings() {
                 Konto löschen
             </button>
 
-            <p style="font-size:12px;color:var(--text-tertiary);text-align:center;margin-top:24px;margin-bottom:8px">ToDoToBe v1.0</p>
+            <p style="font-size:12px;color:var(--text-tertiary);text-align:center;margin-top:24px;margin-bottom:8px">ToDoToBe v1.01</p>
         </div>
     `;
 
