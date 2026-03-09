@@ -566,9 +566,14 @@ function renderCourseCard(course, isCompleted = false) {
                             <div style="font-size:13px;font-weight:500">${escapeHtml(ev.name)}</div>
                             <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(ev.type || 'Übung')} · ${slotStr || ''} ${ev.room ? '· ' + escapeHtml(ev.room) : ''}</div>
                         </div>
-                        <button class="icon-btn delete-extra-btn" data-course-id="${escapeAttr(course.id)}" data-idx="${idx}" style="width:28px;height:28px">
-                            <span class="material-symbols-outlined" style="font-size:14px;color:var(--priority-1)">delete</span>
-                        </button>
+                        <div class="flex gap-1">
+                            <button class="icon-btn edit-extra-btn" data-course-id="${escapeAttr(course.id)}" data-idx="${idx}" style="width:28px;height:28px">
+                                <span class="material-symbols-outlined" style="font-size:14px;color:var(--accent)">edit</span>
+                            </button>
+                            <button class="icon-btn delete-extra-btn" data-course-id="${escapeAttr(course.id)}" data-idx="${idx}" style="width:28px;height:28px">
+                                <span class="material-symbols-outlined" style="font-size:14px;color:var(--priority-1)">delete</span>
+                            </button>
+                        </div>
                     </div>`;
                 }).join('')}` : ''}
 
@@ -638,6 +643,14 @@ function wireExpandCards(content) {
                 if (examEvent) await deleteEvent(examEvent.id);
                 deleteExam(examId);
             }
+        });
+    });
+
+    // Edit additional event (Übung/Tutorium)
+    content.querySelectorAll('.edit-extra-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditExtraModal(btn.dataset.courseId, parseInt(btn.dataset.idx));
         });
     });
 
@@ -1019,4 +1032,108 @@ function openAddExtraModal(courseId) {
     });
 
     setTimeout(() => modal.querySelector('#ex-name').focus(), 100);
+}
+
+// ===== Edit Extra Event (Exercise/Tutorial) Modal =====
+function openEditExtraModal(courseId, idx) {
+    const course = appState.allCourses.find(c => c.id === courseId);
+    if (!course) return;
+    const existing = (course.additionalEvents || [])[idx];
+    if (!existing) return;
+
+    const old = document.getElementById('extra-edit-modal');
+    if (old) old.remove();
+
+    let localSlots = JSON.parse(JSON.stringify(existing.timeSlots || [{ weekday: 0, startTime: '08:00', endTime: '09:30' }]));
+
+    const modal = document.createElement('div');
+    modal.id = 'extra-edit-modal';
+    modal.className = 'modal-overlay';
+
+    function renderEditSlots() {
+        return localSlots.map((s, i) => `
+            <div class="flex gap-2 mb-2 items-center">
+                <select class="glass-select" style="width:70px" data-field="weekday" data-idx="${i}">
+                    ${WEEKDAYS.map((d, wi) => `<option value="${wi}" ${s.weekday === wi ? 'selected' : ''}>${d}</option>`).join('')}
+                </select>
+                <input type="time" class="glass-input flex-1" value="${s.startTime}" data-field="startTime" data-idx="${i}">
+                <input type="time" class="glass-input flex-1" value="${s.endTime}" data-field="endTime" data-idx="${i}">
+                <button class="icon-btn remove-edit-slot" data-idx="${i}">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:var(--priority-1)">remove</span>
+                </button>
+            </div>`).join('');
+    }
+
+    modal.innerHTML = `
+        <div class="modal-backdrop"></div>
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <h2 class="text-lg font-semibold mb-4">Übung / Zusatz bearbeiten</h2>
+            <input type="text" id="exe-name" class="glass-input w-full mb-3" value="${escapeAttr(existing.name)}" placeholder="Name">
+            <select id="exe-type" class="glass-select w-full mb-3">
+                <option value="Übung" ${existing.type === 'Übung' ? 'selected' : ''}>Übung</option>
+                <option value="Tutorium" ${existing.type === 'Tutorium' ? 'selected' : ''}>Tutorium</option>
+                <option value="Sonstiges" ${existing.type === 'Sonstiges' ? 'selected' : ''}>Sonstiges</option>
+            </select>
+            <input type="text" id="exe-room" class="glass-input w-full mb-3" value="${escapeAttr(existing.room || '')}" placeholder="Raum (optional)">
+            <div style="font-size:13px;color:var(--text-tertiary);margin-bottom:8px">Zeitslots</div>
+            <div id="exe-slots">${renderEditSlots()}</div>
+            <button id="exe-add-slot" class="btn-ghost w-full mb-4" style="font-size:13px">+ Zeitslot</button>
+            <button id="exe-save" class="btn-accent w-full">Speichern</button>
+        </div>`;
+    document.body.appendChild(modal);
+
+    function rewireEditSlots() {
+        modal.querySelector('#exe-slots').innerHTML = renderEditSlots();
+        modal.querySelectorAll('[data-field]').forEach(inp => {
+            inp.addEventListener('change', () => {
+                const i = parseInt(inp.dataset.idx);
+                const field = inp.dataset.field;
+                if (field === 'weekday') localSlots[i].weekday = parseInt(inp.value);
+                else localSlots[i][field] = inp.value;
+            });
+        });
+        modal.querySelectorAll('.remove-edit-slot').forEach(btn => {
+            btn.addEventListener('click', () => {
+                localSlots.splice(parseInt(btn.dataset.idx), 1);
+                rewireEditSlots();
+            });
+        });
+    }
+    rewireEditSlots();
+
+    modal.querySelector('#exe-add-slot').addEventListener('click', () => {
+        localSlots.push({ weekday: 0, startTime: '08:00', endTime: '09:30' });
+        rewireEditSlots();
+    });
+
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => modal.remove());
+
+    modal.querySelector('#exe-save').addEventListener('click', async () => {
+        const name = modal.querySelector('#exe-name').value.trim();
+        if (!name) return;
+        modal.querySelector('#exe-save').disabled = true;
+
+        const updatedExtra = {
+            name,
+            type: modal.querySelector('#exe-type').value,
+            room: modal.querySelector('#exe-room').value.trim(),
+            timeSlots: localSlots
+        };
+
+        const extras = [...(course.additionalEvents || [])];
+        const oldName = existing.name;
+        // Always delete old calendar events and regenerate (handles name change + schedule change)
+        await deleteCalendarEventsForExtra(courseId, oldName);
+        if (name !== oldName) {
+            await deleteCalendarEventsForExtra(courseId, name); // clean up any pre-existing with new name
+        }
+        extras[idx] = updatedExtra;
+        await updateCourse(courseId, { additionalEvents: extras });
+        const updatedCourse = { ...course, additionalEvents: extras };
+        await generateCourseCalendarEvents(updatedCourse);
+        modal.remove();
+    });
+
+    setTimeout(() => modal.querySelector('#exe-name').focus(), 100);
 }

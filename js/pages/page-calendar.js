@@ -6,7 +6,7 @@ import {
     getFirstDayOfWeek, isSameDay, toDate, startOfDay, escapeHtml, escapeAttr,
     getActiveSemester, isTodayLectureDay, toInputDate, isTodoActiveOnDate, safeCssColor
 } from '../utils.js';
-import { addEvent, updateEvent, deleteEvent, addCalendarCategory, deleteCalendarCategory } from '../db.js';
+import { addEvent, updateEvent, deleteEvent, addCalendarCategory, deleteCalendarCategory, updateUserSettings } from '../db.js';
 
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
@@ -121,6 +121,19 @@ export function initPageCalendar() {
 
 // ----- helpers -----
 
+const DEFAULT_TYPE_COLORS = {
+    todos: '#00ffd5',
+    exams: '#ef4444',
+    assignments: '#f97316',
+    courses: '#3b82f6',
+    wishes: '#a55eea',
+    events: '#22c55e',
+};
+
+function getTypeColor(type) {
+    return (appState.settings?.calendarTypeColors?.[type]) || DEFAULT_TYPE_COLORS[type] || '#888';
+}
+
 function getCourseSlotsForDate(date) {
     // Convert JS weekday (0=Sun) to Mon-based index (Mon=0 ... Sun=6)
     const jsDay = date.getDay();
@@ -207,7 +220,7 @@ function buildItemsByDay() {
         (wishesByDay[key] = wishesByDay[key] || []).push(w);
     });
 
-    appState.allEvents.filter(ev => !ev.courseId).forEach(ev => {
+    appState.allEvents.filter(ev => !ev.courseId && !ev.examId).forEach(ev => {
         if (!ev.date) return;
         let d;
         if (typeof ev.date === 'string') {
@@ -281,12 +294,12 @@ function renderCalendar() {
         // Color dots for categories
         if (!isSelected) {
             const dotConfigs = [
-                { show: hasActiveTodos, color: 'var(--accent)' },
-                { show: hasExams, color: '#ef4444' },
-                { show: hasAssignments, color: '#f97316' },
-                { show: hasLecture, color: '#3b82f6' },
-                { show: hasWishes, color: 'var(--accent)' },
-                { show: hasEvents, color: '#22c55e' },
+                { show: hasActiveTodos, color: getTypeColor('todos') },
+                { show: hasExams, color: getTypeColor('exams') },
+                { show: hasAssignments, color: getTypeColor('assignments') },
+                { show: hasLecture, color: getTypeColor('courses') },
+                { show: hasWishes, color: getTypeColor('wishes') },
+                { show: hasEvents, color: getTypeColor('events') },
             ].filter(c => c.show);
 
             if (dotConfigs.length > 0) {
@@ -345,7 +358,7 @@ function renderDayItems() {
     // --- Todos ---
     if (calFilter !== 'uni' && calFilter !== 'wishes' && todos.length > 0) {
         hasContent = true;
-        if (calFilter === 'all') sectionLabel('Todos', 'var(--accent)');
+        if (calFilter === 'all') sectionLabel('Todos', getTypeColor('todos'));
         todos.forEach(todo => {
             const listInfo = appState.allLists.find(l => l.id === todo.listId);
             const el = createTodoElement(todo, {
@@ -364,7 +377,7 @@ function renderDayItems() {
 
     if (showUni && (courseSlots.length > 0 || exams.length > 0 || openAssignments.length > 0)) {
         hasContent = true;
-        if (calFilter === 'all') sectionLabel('Uni', '#3b82f6');
+        if (calFilter === 'all') sectionLabel('Uni', getTypeColor('courses'));
 
         // Timetable blocks (course slots for this day)
         courseSlots.forEach(({ course, slot, extra, type }) => {
@@ -394,16 +407,17 @@ function renderDayItems() {
         // Exams
         exams.forEach(exam => {
             const course = appState.allCourses.find(c => c.id === exam.courseId);
+            const examColor = getTypeColor('exams');
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
-            card.style.cssText = 'border-left:3px solid #ef4444';
+            card.style.cssText = `border-left:3px solid ${examColor}`;
             card.innerHTML = `
-                <span class="material-symbols-outlined" style="font-size:20px;color:#ef4444;flex-shrink:0">quiz</span>
+                <span class="material-symbols-outlined" style="font-size:20px;color:${examColor};flex-shrink:0">quiz</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(exam.title)}</div>
                     <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(course?.name || '')} · Klausur${exam.room ? ' · ' + escapeHtml(exam.room) : ''}${exam.time ? ' · ' + exam.time : ''}</div>
                 </div>
-                ${exam.grade != null ? `<span style="font-size:13px;font-weight:600;color:${exam.grade <= 4 ? 'var(--accent)' : '#ef4444'}">${exam.grade.toFixed(1)}</span>` : ''}
+                ${exam.grade != null ? `<span style="font-size:13px;font-weight:600;color:${exam.grade <= 4 ? 'var(--accent)' : examColor}">${exam.grade.toFixed(1)}</span>` : ''}
             `;
             dayItems.appendChild(card);
         });
@@ -411,11 +425,12 @@ function renderDayItems() {
         // Open assignments
         openAssignments.forEach(a => {
             const course = appState.allCourses.find(c => c.id === a.courseId);
+            const assignColor = getTypeColor('assignments');
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
-            card.style.cssText = 'border-left:3px solid #f97316';
+            card.style.cssText = `border-left:3px solid ${assignColor}`;
             card.innerHTML = `
-                <span class="material-symbols-outlined" style="font-size:20px;color:#f97316;flex-shrink:0">assignment</span>
+                <span class="material-symbols-outlined" style="font-size:20px;color:${assignColor};flex-shrink:0">assignment</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(a.title)}</div>
                     <div style="font-size:11px;color:var(--text-tertiary)">${escapeHtml(course?.name || '')} · Aufgabe</div>
@@ -431,16 +446,17 @@ function renderDayItems() {
         : events;
     if ((calFilter === 'all' || calFilter === 'personal') && visibleEvents.length > 0) {
         hasContent = true;
-        if (calFilter === 'all') sectionLabel('Termine', '#22c55e');
+        const evColor = getTypeColor('events');
+        if (calFilter === 'all') sectionLabel('Termine', evColor);
         visibleEvents.forEach(ev => {
             const timeRange = ev.time
                 ? (ev.endTime ? `${ev.time}–${ev.endTime}` : ev.time)
                 : '';
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
-            card.style.cssText = 'border-left:3px solid #22c55e';
+            card.style.cssText = `border-left:3px solid ${evColor}`;
             card.innerHTML = `
-                <span class="material-symbols-outlined" style="font-size:20px;color:#22c55e;flex-shrink:0">event</span>
+                <span class="material-symbols-outlined" style="font-size:20px;color:${evColor};flex-shrink:0">event</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(ev.title)}</div>
                     <div style="font-size:11px;color:var(--text-tertiary)">${timeRange ? escapeHtml(timeRange) : ''}${timeRange && ev.category ? ' · ' : ''}${ev.category ? escapeHtml(ev.category) : ''}</div>
@@ -456,18 +472,19 @@ function renderDayItems() {
     // --- Wünsche ---
     if ((calFilter === 'all' || calFilter === 'wishes') && wishes.length > 0) {
         hasContent = true;
-        if (calFilter === 'all') sectionLabel('Wünsche', 'var(--accent)');
+        const wishColor = getTypeColor('wishes');
+        if (calFilter === 'all') sectionLabel('Wünsche', wishColor);
         wishes.forEach(w => {
             const nutzen = w.nutzen || 0;
             const stars = '★'.repeat(nutzen) + '☆'.repeat(Math.max(0, 5 - nutzen));
             const card = document.createElement('div');
             card.className = 'glass-sm p-3 mb-2 flex items-center gap-3';
-            card.style.cssText = 'border-left:3px solid var(--accent)';
+            card.style.cssText = `border-left:3px solid ${wishColor}`;
             card.innerHTML = `
-                <span class="material-symbols-outlined" style="font-size:20px;color:var(--accent);flex-shrink:0">star</span>
+                <span class="material-symbols-outlined" style="font-size:20px;color:${wishColor};flex-shrink:0">star</span>
                 <div class="flex-1 min-w-0">
                     <div style="font-size:14px;font-weight:500">${escapeHtml(w.name || w.title || '')}</div>
-                    <div style="font-size:11px;color:var(--accent);letter-spacing:2px">${stars}</div>
+                    <div style="font-size:11px;color:${wishColor};letter-spacing:2px">${stars}</div>
                 </div>
                 ${w.price != null ? `<span style="font-size:12px;color:var(--text-tertiary);flex-shrink:0">${w.price.toFixed(2)} €</span>` : ''}
             `;
@@ -587,6 +604,15 @@ function openAddEventModal(defaultDate, existing = null, defaultCategory = null)
 
 // ----- Category Management Modal -----
 
+const TYPE_COLOR_LABELS = [
+    { key: 'todos',       label: 'Todos' },
+    { key: 'exams',       label: 'Klausuren' },
+    { key: 'assignments', label: 'Aufgaben' },
+    { key: 'courses',     label: 'Uni (Kurse)' },
+    { key: 'wishes',      label: 'Wünsche' },
+    { key: 'events',      label: 'Termine' },
+];
+
 function openManageCategoriesModal() {
     const old = document.getElementById('cat-manage-modal');
     if (old) old.remove();
@@ -595,29 +621,73 @@ function openManageCategoriesModal() {
     modal.id = 'cat-manage-modal';
     modal.className = 'modal-overlay';
 
+    const currentTypeColors = { ...DEFAULT_TYPE_COLORS, ...(appState.settings?.calendarTypeColors || {}) };
+
+    const typeColorRows = TYPE_COLOR_LABELS.map(({ key, label }) => `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+            <div class="type-color-dot" data-key="${key}" style="width:14px;height:14px;border-radius:50%;background:${currentTypeColors[key]};flex-shrink:0"></div>
+            <span style="flex:1;font-size:14px">${escapeHtml(label)}</span>
+            <input type="color" class="type-color-picker" data-key="${key}" value="${currentTypeColors[key]}"
+                title="Farbe für ${escapeHtml(label)}"
+                style="width:36px;height:36px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);cursor:pointer;background:rgba(255,255,255,0.08);padding:2px;flex-shrink:0">
+        </div>
+    `).join('');
+
     modal.innerHTML = `
         <div class="modal-backdrop"></div>
         <div class="modal-sheet">
             <div class="modal-handle"></div>
-            <h2 class="text-lg font-semibold mb-4">Kategorien verwalten</h2>
-            <div id="cat-manage-list"></div>
-            <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08)">
-                <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">Neue Kategorie</div>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <input type="text" id="cat-new-name" class="glass-input" style="flex:1" placeholder="Name">
-                    <input type="color" id="cat-new-color" value="#6b7280" title="Farbe wählen"
-                        style="width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);cursor:pointer;background:rgba(255,255,255,0.08);padding:2px;flex-shrink:0">
-                    <button id="cat-new-add" class="btn-accent" style="padding:0 16px;height:40px;flex-shrink:0">+</button>
+            <h2 class="text-lg font-semibold mb-4">Kalender-Farben</h2>
+
+            <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Kalender-Typen</div>
+            <div id="type-color-list">${typeColorRows}</div>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08)">
+                <div style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Termin-Kategorien</div>
+                <div id="cat-manage-list"></div>
+                <div style="margin-top:12px">
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:8px">Neue Kategorie</div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <input type="text" id="cat-new-name" class="glass-input" style="flex:1" placeholder="Name">
+                        <input type="color" id="cat-new-color" value="#6b7280" title="Farbe wählen"
+                            style="width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);cursor:pointer;background:rgba(255,255,255,0.08);padding:2px;flex-shrink:0">
+                        <button id="cat-new-add" class="btn-accent" style="padding:0 16px;height:40px;flex-shrink:0">+</button>
+                    </div>
                 </div>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
 
+    // Wire type color pickers
+    const pendingColors = { ...currentTypeColors };
+    let saveTimeout = null;
+
+    modal.querySelectorAll('.type-color-picker').forEach(picker => {
+        picker.addEventListener('input', () => {
+            const key = picker.dataset.key;
+            pendingColors[key] = picker.value;
+            // Update the dot preview
+            modal.querySelector(`.type-color-dot[data-key="${key}"]`).style.background = picker.value;
+            // Debounce save
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(async () => {
+                const newSettings = { ...appState.settings, calendarTypeColors: { ...pendingColors } };
+                appState.settings = newSettings;
+                await updateUserSettings(newSettings);
+                renderCalendar();
+            }, 600);
+        });
+    });
+
     function renderCatList() {
         const list = modal.querySelector('#cat-manage-list');
         if (!list) return;
         list.innerHTML = '';
+        if (appState.calendarCategories.length === 0) {
+            list.innerHTML = `<div style="font-size:13px;color:var(--text-tertiary);padding:8px 0">Keine Kategorien</div>`;
+            return;
+        }
         appState.calendarCategories.forEach(cat => {
             const row = document.createElement('div');
             row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)';
@@ -638,7 +708,7 @@ function openManageCategoriesModal() {
     renderCatList();
     const unsub = onStateChange(() => renderCatList());
 
-    modal.querySelector('.modal-backdrop').addEventListener('click', () => { unsub(); modal.remove(); });
+    modal.querySelector('.modal-backdrop').addEventListener('click', () => { unsub(); clearTimeout(saveTimeout); modal.remove(); });
 
     modal.querySelector('#cat-new-add').addEventListener('click', async () => {
         const nameInput = modal.querySelector('#cat-new-name');
