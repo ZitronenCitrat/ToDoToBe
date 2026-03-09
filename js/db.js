@@ -695,7 +695,10 @@ export async function addEvent(data) {
         ...(data.extraEventName ? { extraEventName: data.extraEventName } : {}),
         createdAt: Timestamp.now()
     });
-    gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, endTime: data.endTime, category: data.category });
+    // Skip GCal sync for course-generated and exam-linked events — those are synced via their own entities
+    if (!data.courseId && !data.examId) {
+        gcalSync('event', ref.id, { title: data.title, date: dateTs, time: data.time, endTime: data.endTime, category: data.category });
+    }
     return ref;
 }
 
@@ -704,6 +707,9 @@ export async function updateEvent(eventId, updates) {
         updates.date = updates.date ? Timestamp.fromDate(new Date(updates.date)) : null;
     }
     await updateDoc(userDoc('events', eventId), updates);
+    const existing = appState.allEvents.find(e => e.id === eventId);
+    // Skip GCal sync for course-generated and exam-linked events
+    if (existing?.courseId || existing?.examId) return;
     if (updates.date !== undefined || updates.title !== undefined || updates.time !== undefined || updates.endTime !== undefined) {
         gcalSync('event', eventId, updates);
     }

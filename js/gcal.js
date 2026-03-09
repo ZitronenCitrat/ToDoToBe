@@ -172,9 +172,16 @@ export function showGcalReconnectBanner() {
     const btn = document.createElement('button');
     btn.style.cssText = 'font-size:13px;color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer';
     btn.textContent = 'Neu verbinden';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
         banner.remove();
-        connectGcal();
+        // Try silent refresh first — only show account picker if that fails
+        try {
+            await refreshTokenSilent();
+        } catch {
+            // Silent refresh failed: use select_account (less friction than consent — no re-consent needed)
+            const client = getTokenClient();
+            if (client) client.requestAccessToken({ prompt: 'select_account' });
+        }
     });
 
     banner.appendChild(label);
@@ -467,9 +474,9 @@ export async function syncAllToGcal(appState) {
         .filter(t => t.dueDate && !t.completed)
         .forEach(t => tasks.push(verifyAndSyncEntity('todo', t)));
 
-    // Events (Termine) — skip course-generated events (shown via timetable, not as extra Termine)
+    // Events (Termine) — skip course-generated events and exam-linked events (those are synced as exam entities)
     appState.allEvents
-        .filter(ev => ev.date && !ev.courseId)
+        .filter(ev => ev.date && !ev.courseId && !ev.examId)
         .forEach(ev => tasks.push(verifyAndSyncEntity('event', ev)));
 
     // Exams with dates
